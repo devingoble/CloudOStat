@@ -23,6 +23,16 @@ Coprocessor:
 
 # Network configuration.
 Network:
+# Network configuration.
+    Interfaces:
+        - Name: WiFi
+          UseDHCP: true
+          IPAddress:
+          NetMask:
+          Gateway:
+
+    # Which interface should be used?
+    DefaultInterface: WiFi
 
     # Automatically attempt to get the time at startup?
     GetNetworkTimeAtStartup: true

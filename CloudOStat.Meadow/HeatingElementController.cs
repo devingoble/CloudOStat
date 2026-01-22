@@ -1,9 +1,10 @@
-﻿using CloudOStat.Meadow;
+﻿using CloudOStat.Drivers;
 
 using Meadow.Foundation.Controllers.Pid;
 using Meadow.Foundation.Sensors.Temperature;
 using Meadow.Hardware;
 using Meadow.Peripherals.Controllers.PID;
+using Meadow.Units;
 
 using System;
 using System.Collections.Generic;
@@ -44,7 +45,7 @@ namespace CloudOStat.LocalHardware
             _updateInterval = updateInterval;
             _targetTemperature = temp;
             // TEMP - to be replaced with PID stuff
-            _heaterRelay.Frequency = 1.0f / 5.0f; // 5 seconds to start (later we can slow down)
+            _heaterRelay.Frequency = new Frequency(1.0f / 5.0f, Frequency.UnitType.Hertz); // 5 seconds to start (later we can slow down)
             // on start, if we're under temp, turn on the heat to start.
             float duty = (_tempSensor.GetProbeTemperatureDataFahrenheit() < _targetTemperature) ? 1.0f : 0.0f;
             this._heaterRelay.DutyCycle = duty;

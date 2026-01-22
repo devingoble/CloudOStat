@@ -3,62 +3,34 @@ using System.Net.NetworkInformation;
 using System.Threading;
 using Meadow;
 using Meadow.Devices;
-using Meadow.Foundation;
-using Meadow.Foundation.Displays.Lcd;
-using Meadow.Foundation.Leds;
-using Meadow.Gateway.WiFi;
+using Meadow.Units;
 
-using static Meadow.Peripherals.Leds.IRgbLed;
 using System.IO;
-using Meadow.Foundation.Controllers.Pid;
 using System.Threading.Tasks;
 using System.Text.Json;
+using Meadow.Hardware;
+using CloudOStat.Controllers;
 
 namespace CloudOStat.LocalHardware
 {
-    public class MeadowApp : App<F7Micro, MeadowApp>
+    public class MeadowApp : App<F7FeatherV1>
     {
-        AzureConnection _azure;
         Hardware _hardware;
-        //Settings _settings;
-        bool _isConnected = false;
         HeatingElementController _controller;
+        IIoTHubController _iotHubController;
 
-        public MeadowApp()
+        public override async Task Initialize()
         {
-            WaitForWifi();
-
             _hardware = new Hardware(Device);
-            //_controller = new HeatingElementController(_hardware.AirSensor, _hardware.HeaterRelay);
 
-            //while (_settings == null)
-            //{
-            //    _settings = ReadSettings();
+            InitWiFi();
 
-            //    if (_settings == null)
-            //    {
-            //        _hardware.Display.WriteLine("No settings found", 1);
-            //        _hardware.Display.WriteLine("Retry in 5 seconds", 2);
+            _iotHubController = new IoTHubMqttController();
+            await InitializeIoTHub();
+        }
 
-            //        Thread.Sleep(10000);
-            //    }
-            //}
-
-            //Console.WriteLine("Wifi: " + _settings.WiFiSSID);
-            //Console.WriteLine("Key: " + _settings.WiFiKey);
-
-            //while (!_isConnected)
-            //{
-            //    _isConnected = InitWifi(_settings);
-            //}
-
-            //_azure = new AzureConnection(_settings.AzureConnectionString);
-            //_azure.Connect();
-
-            //_pid = new StandardPidController();
-
-            //_controller.StartCook(_settings.DefaultTemperature, _settings.UpdateInterval);
-
+        public override Task Run()
+        {
             while (true)
             {
                 var airValue = _hardware.AirSensor.GetProbeTemperatureDataFahrenheit();
@@ -114,32 +86,81 @@ namespace CloudOStat.LocalHardware
                 };
 
                 DisplayTemperatures(225, airValue, meat1Value, meat2Value, status);
+                _iotHubController.SendEnvironmentalReading(new Temperature(meat1Value, Temperature.UnitType.Fahrenheit), new Temperature(meat2Value, Temperature.UnitType.Fahrenheit), new Temperature(airValue, Temperature.UnitType.Fahrenheit));
 
                 Thread.Sleep(5000);
             }
         }
 
-        void WaitForWifi()
+        void InitWiFi()
         {
-            if (Device.WiFiAdapter.IsConnected)
+            Resolver.Log.Info("Init wifi...");
+
+            _hardware.Display.ClearLines();
+            _hardware.Display.Write("Init WiFi...");
+
+            var wifi = Resolver.Device.NetworkAdapters.Primary<IWiFiNetworkAdapter>();
+
+            if (wifi.IsConnected)
             {
-                Console.WriteLine("WiFi adapter already connected.");
+                Resolver.Log.Info("Already connected to WiFi.");
             }
             else
             {
-                Console.WriteLine("WiFi adapter not connected.");
+                Resolver.Log.Info("Not connected to WiFi yet.");
+            }
+            // connect event
+            wifi.NetworkConnected += (networkAdapter, networkConnectionEventArgs) =>
+            {
+                Resolver.Log.Info($"Joined network - IP Address: {networkAdapter.IpAddress}");
+                _hardware.Display.ClearLines();
+                _hardware.Display.WriteLine("Joined network:", 0);
+                _hardware.Display.WriteLine($"IP Address:", 1);
+                _hardware.Display.WriteLine(networkAdapter.IpAddress.ToString(), 1);
 
-                Device.WiFiAdapter.WiFiConnected += (s, e) => {
-                    Console.WriteLine("WiFi adapter connected.");
-                };
+                return;
+            };
+            // disconnect event
+            wifi.NetworkDisconnected += (o, e) =>
+            {
+                Resolver.Log.Info($"Network disconnected.");
+
+                return;
+            };
+        }
+
+        private async Task InitializeIoTHub()
+        {
+            while (!_iotHubController.isAuthenticated)
+            {
+                _hardware.Display.ClearLines();
+                _hardware.Display.Write("Connecting...");
+
+                bool authenticated = await _iotHubController.Initialize();
+
+                if (authenticated)
+                {
+                    Resolver.Log.Info("Authenticated");
+                    _hardware.Display.ClearLines();
+                    _hardware.Display.Write("Connected");
+                }
+                else
+                {
+                    Resolver.Log.Info("Not Authenticated");
+                    _hardware.Display.ClearLines();
+                    _hardware.Display.Write("Could not connect");
+                }
+
+
+                await Task.Delay(TimeSpan.FromSeconds(5));
             }
         }
 
         private void DisplayTemperatures(double target, double airValue, double meat1Value, double meat2Value, string status)
         {
-            var airLabel = $"Act:{airValue} - Tgt:{target}";
-            var meat1Label = $"Meat 1:{meat1Value}";
-            var meat2Label = $"Meat 2:{meat2Value}";
+            var airLabel = $"Air:{Math.Round(airValue, 2)} - Tgt:{target}";
+            var meat1Label = $"Meat 1:{Math.Round(meat1Value, 2)}";
+            var meat2Label = $"Meat 2:{Math.Round(meat2Value, 2)}";
             var statusLabel = $"Status:{status}";
 
             _hardware.Display.WriteLine(airLabel, 0);

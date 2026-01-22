@@ -1,10 +1,9 @@
-﻿<Project Sdk="Meadow.Sdk/1.1.0">
+<Project Sdk="Meadow.Sdk/1.1.0">
     <PropertyGroup>
         <TargetFramework>netstandard2.1</TargetFramework>
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
         <OutputType>Library</OutputType>
         <AssemblyName>App</AssemblyName>
-        <RootNamespace>CloudOStat.LocalHardware</RootNamespace>
         <LangVersion>10.0</LangVersion>
     </PropertyGroup>
     <ItemGroup>
@@ -12,21 +11,13 @@
         <PackageReference Include="Meadow.Foundation" Version="*" />
     </ItemGroup>
     <ItemGroup>
-        <PackageReference Include="Meadow.Foundation.Displays.Lcd.CharacterDisplay" Version="1.11.0" />
-        <PackageReference Include="System.Runtime" Version="4.3.1" />
-        <PackageReference Include="System.Text.Json" Version="8.0.3" />
-    </ItemGroup>
-    <ItemGroup>
-        <None Update="desiredState.json">
+        <None Include="meadow.config.yaml">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
-        <None Update="meadow.config.yaml">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="wifi.config.yaml">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
         <None Include="app.config.yaml">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Include="wifi.config.yaml">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
     </ItemGroup>

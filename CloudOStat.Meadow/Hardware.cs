@@ -1,17 +1,11 @@
-﻿using CloudOStat.Meadow;
+﻿using CloudOStat.Drivers;
 
 using Meadow.Devices;
 using Meadow.Foundation.Displays.Lcd;
 using Meadow.Foundation.Leds;
 using Meadow.Hardware;
-
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-using static Meadow.Peripherals.Leds.IRgbLed;
+using Meadow.Peripherals.Leds;
+using Meadow.Units;
 
 namespace CloudOStat.LocalHardware
 {
@@ -24,7 +18,7 @@ namespace CloudOStat.LocalHardware
         public CharacterDisplay Display { get; private set; }
         public RgbPwmLed OnboardLed { get; private set; }
 
-        public Hardware(F7Micro device)
+        public Hardware(F7FeatherV1 device)
         {
             var spiBus = device.CreateSpiBus();
             var pin0 = device.CreateDigitalOutputPort(device.Pins.D00);
@@ -35,7 +29,6 @@ namespace CloudOStat.LocalHardware
             MeatSensor1 = new MAX31855(spiBus, pin1);
             MeatSensor2 = new MAX31855(spiBus, pin2);
             Display = new CharacterDisplay(
-                device,
                 pinRS: device.Pins.D05,
                 pinE: device.Pins.D06,
                 pinD4: device.Pins.D07,
@@ -45,11 +38,11 @@ namespace CloudOStat.LocalHardware
                 rows: 4,
                 columns: 20);
 
-            OnboardLed = new RgbPwmLed(device: device,
+            OnboardLed = new RgbPwmLed(
                 redPwmPin: device.Pins.OnboardLedRed,
                 greenPwmPin: device.Pins.OnboardLedGreen,
                 bluePwmPin: device.Pins.OnboardLedBlue,
-                3.3f, 3.3f, 3.3f,
+                new Voltage(3.3), new Voltage(3.3), new Voltage(3.3),
                 CommonType.CommonAnode);
         }
     }

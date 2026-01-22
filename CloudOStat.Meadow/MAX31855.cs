@@ -1,4 +1,6 @@
-﻿using Meadow.Hardware;
+﻿using Meadow;
+using Meadow.Foundation;
+using Meadow.Hardware;
 
 using System;
 using System.Collections.Generic;
@@ -6,7 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CloudOStat.Meadow
+namespace CloudOStat.Drivers
 {
     public class MAX31855
     {
@@ -44,21 +46,31 @@ namespace CloudOStat.Meadow
         }
 
         private readonly ISpiBus _spiBus;
-        private readonly ISpiPeripheral _spiPeripheral;
+        private readonly ISpiCommunications _spiComms;
         //private byte[] _thermocoupleData = new byte[4];
         private Faults _fault = Faults.OK;
+        IDigitalOutputPort _chipSelect;
 
 
         public MAX31855(ISpiBus spiBus, IDigitalOutputPort chipSelect = null)
         {
             _spiBus = spiBus;
-            _spiPeripheral = new SpiPeripheral(_spiBus, chipSelect);
+            _spiComms = new SpiCommunications(_spiBus, chipSelect, new Meadow.Units.Frequency(5, Meadow.Units.Frequency.UnitType.Megahertz));
+
+            if(_spiComms == null)
+            {
+                Resolver.Log.Info("Error: Null");
+            }
         }
 
         public double GetProbeTemperatureDataCelsius()
         {
+            Resolver.Log.Info("Log 1");
+
             uint data = BitConverter.ToUInt32(ReadThermocoupleData(), 0);
 
+            Resolver.Log.Info("raw data: " + data.ToString());
+            Resolver.Log.Info("Log 2");
             //check for fault
             switch (data & 0x07) // first three bits are faults 0b111, if all are 0 then we have good data
             {
@@ -78,12 +90,15 @@ namespace CloudOStat.Meadow
                     _fault = Faults.GENERAL_FAULT;
                     break;
             }
+            Resolver.Log.Info("Log 3");
 
             if (_fault != Faults.OK)
             {
-                throw new Exception(Enum.GetName(typeof(Faults), _fault));
+                Resolver.Log.Info("Fault - " + _spiComms.ChipSelect.Pin.Name + ": " + _fault);
+                //throw new Exception(Enum.GetName(typeof(Faults), _fault));
             }
-            
+            Resolver.Log.Info("Log 4");
+
             // Negative value, drop the lower 18 bits and explicitly extend sign bits.
             if ((data & 0x80000000) != 0)
             {
@@ -94,8 +109,11 @@ namespace CloudOStat.Meadow
             {
                 data >>= 18;
             }
+            Resolver.Log.Info("Log 5");
 
             double celsius = data;
+
+            Resolver.Log.Info("C: " + data.ToString());
 
             // LSB = 0.25 degrees C 
             celsius *= 0.25;
@@ -106,11 +124,15 @@ namespace CloudOStat.Meadow
         {
             uint data = BitConverter.ToUInt32(ReadThermocoupleData(), 0);
 
+            Resolver.Log.Info("IntData: " + data.ToString());
+
             // Ignore bottom 4 digits
             data >>= 4;
 
             // pull the bottom 11 bits off 
             double celsius = data & 0x7FF;
+
+            Resolver.Log.Info("IntC: " + celsius.ToString());
 
             // check sign bit! 
             if ((data & 0x800) == 1)
@@ -126,7 +148,7 @@ namespace CloudOStat.Meadow
 
         public double GetProbeTemperatureDataFahrenheit()
         {
-            return ConvertCelsiusToFahrenheit(GetProbeTemperatureDataCelsius());
+            return GetCorrectedFahrenheit();
         }
 
         public double GetInternalTemperatureDataFahrenheit()
@@ -228,10 +250,9 @@ namespace CloudOStat.Meadow
 
         private byte[] ReadThermocoupleData()
         {
-            Span<Byte> buffer = default;
-            _spiPeripheral.Read(buffer);
+            byte[] buffer = new byte[4];
+            _spiComms.Read(buffer);
             var raw = buffer.ToArray();
-
             //Data from the sensor is big endian.  We need to convert to little endian.
             Array.Reverse(raw);
 
