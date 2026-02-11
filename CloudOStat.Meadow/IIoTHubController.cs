@@ -1,6 +1,7 @@
 ﻿using Meadow.Units;
-
+using System.Collections.Generic;
 using System.Threading.Tasks;
+using CloudOStat.LocalHardware;
 
 namespace CloudOStat.Controllers;
 
@@ -23,4 +24,6 @@ internal interface IIoTHubController
     Task<bool> Initialize();
 
     Task SendEnvironmentalReading(Temperature meatOne, Temperature meatTwo, Temperature air);
+
+    Task SendBatchEnvironmentalReadings(List<TemperatureReading> readings);
 }

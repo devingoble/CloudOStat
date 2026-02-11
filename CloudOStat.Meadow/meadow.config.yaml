@@ -27,9 +27,6 @@ Network:
     Interfaces:
         - Name: WiFi
           UseDHCP: true
-          IPAddress:
-          NetMask:
-          Gateway:
 
     # Which interface should be used?
     DefaultInterface: WiFi

@@ -13,7 +13,9 @@ public class Secrets
     public const string DEVICE_ID = "cloudostat-meadow";
 
     /// <summary>
-    /// example "SharedAccessSignature sr=MeadowIoTHub ..... "
+    /// Device connection string from Azure IoT Hub
+    /// Get this from: IoT Hub -> Device management -> Devices -> [Your Device] -> Primary Connection String
+    /// Format: "HostName=usw-iot-cloudostat.azure-devices.net;DeviceId=cloudostat-meadow;SharedAccessKey=YOUR_DEVICE_KEY"
     /// </summary>
-    public const string SAS_TOKEN = "SharedAccessSignature sr=usw-iot-cloudostat.azure-devices.net%2Fdevices%2Fcloudostat-meadow&sig=W6IE%2FtYMl%2FpcyiNYXkq3uLtyLyhTYlCkAzxxJ5RIetY%3D&se=1715905722";
+    public const string CONNECTION_STRING = "";
 }

@@ -8,9 +8,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CloudOStat.Drivers
+namespace CloudOStat.Common.Drivers
 {
-    public class MAX31855
+    public class MAX31855 : IMAX31855
     {
         public enum Faults
         {
@@ -57,7 +57,7 @@ namespace CloudOStat.Drivers
             _spiBus = spiBus;
             _spiComms = new SpiCommunications(_spiBus, chipSelect, new Meadow.Units.Frequency(5, Meadow.Units.Frequency.UnitType.Megahertz));
 
-            if(_spiComms == null)
+            if (_spiComms == null)
             {
                 Resolver.Log.Info("Error: Null");
             }

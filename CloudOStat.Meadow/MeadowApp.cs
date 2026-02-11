@@ -10,20 +10,28 @@ using System.Threading.Tasks;
 using System.Text.Json;
 using Meadow.Hardware;
 using CloudOStat.Controllers;
+using System.Collections.Generic;
 
 namespace CloudOStat.LocalHardware
 {
     public class MeadowApp : App<F7FeatherV1>
     {
-        Hardware _hardware;
+        HardwarePackage _hardware;
         HeatingElementController _controller;
         IIoTHubController _iotHubController;
 
-        public override async Task Initialize()
-        {
-            _hardware = new Hardware(Device);
+        // Configurable IoT Hub send interval (in milliseconds)
+        const int IOT_HUB_SEND_INTERVAL_MS = 20000; // 20 seconds
+        const int DISPLAY_REFRESH_INTERVAL_MS = 5000; // 5 seconds
 
-            InitWiFi();
+        // Collection to store readings for batching
+        private readonly List<TemperatureReading> _readingsBatch = new List<TemperatureReading>();
+
+        public async override Task Initialize()
+        {
+            _hardware = new HardwarePackage(Device);
+
+            await InitWiFi();
 
             _iotHubController = new IoTHubMqttController();
             await InitializeIoTHub();
@@ -31,6 +39,8 @@ namespace CloudOStat.LocalHardware
 
         public override Task Run()
         {
+            DateTime lastIoTHubSend = DateTime.MinValue;
+
             while (true)
             {
                 var airValue = _hardware.AirSensor.GetProbeTemperatureDataFahrenheit();
@@ -83,16 +93,44 @@ namespace CloudOStat.LocalHardware
                     _hardware.HeaterRelay.State = false;
                     status = "On Temp";
                     _hardware.OnboardLed.SetColor(Color.Green);
-                };
+                }
 
+                // Always refresh the display
                 DisplayTemperatures(225, airValue, meat1Value, meat2Value, status);
-                _iotHubController.SendEnvironmentalReading(new Temperature(meat1Value, Temperature.UnitType.Fahrenheit), new Temperature(meat2Value, Temperature.UnitType.Fahrenheit), new Temperature(airValue, Temperature.UnitType.Fahrenheit));
 
-                Thread.Sleep(5000);
+                // Add reading to batch collection
+                var reading = new TemperatureReading(
+                    DateTime.UtcNow,
+                    airValue,
+                    meat1Value,
+                    meat2Value,
+                    status
+                );
+                _readingsBatch.Add(reading);
+
+                // Only send to IoT Hub at the configured interval
+                var timeSinceLastSend = DateTime.UtcNow - lastIoTHubSend;
+                if (timeSinceLastSend.TotalMilliseconds >= IOT_HUB_SEND_INTERVAL_MS)
+                {
+                    // Send the entire batch
+                    if (_readingsBatch.Count > 0)
+                    {
+                        _iotHubController.SendBatchEnvironmentalReadings(_readingsBatch);
+                        
+                        Resolver.Log.Info($"IoT Hub batch sent with {_readingsBatch.Count} readings. Next batch in {IOT_HUB_SEND_INTERVAL_MS / 1000} seconds.");
+                        
+                        // Clear the batch after sending
+                        _readingsBatch.Clear();
+                    }
+                    
+                    lastIoTHubSend = DateTime.UtcNow;
+                }
+
+                Thread.Sleep(DISPLAY_REFRESH_INTERVAL_MS);
             }
         }
 
-        void InitWiFi()
+        async Task InitWiFi()
         {
             Resolver.Log.Info("Init wifi...");
 
@@ -103,29 +141,45 @@ namespace CloudOStat.LocalHardware
 
             if (wifi.IsConnected)
             {
-                Resolver.Log.Info("Already connected to WiFi.");
+                Resolver.Log.Info($"Already connected to WiFi - IP Address: {wifi.IpAddress}");
+                _hardware.Display.ClearLines();
+                _hardware.Display.WriteLine("WiFi Connected", 0);
+                _hardware.Display.WriteLine(wifi.IpAddress.ToString(), 1);
             }
             else
             {
-                Resolver.Log.Info("Not connected to WiFi yet.");
+                Resolver.Log.Info($"Not connected to WiFi yet. MAC: {wifi.MacAddress}");
+                _hardware.Display.WriteLine("Waiting for WiFi...", 0);
             }
-            // connect event
-            wifi.NetworkConnected += (networkAdapter, networkConnectionEventArgs) =>
+
+            wifi.NetworkConnecting += (sender) =>
             {
-                Resolver.Log.Info($"Joined network - IP Address: {networkAdapter.IpAddress}");
+                Resolver.Log.Info("Network connecting...");
+                _hardware.Display.ClearLines();
+                _hardware.Display.Write("Network Connecting...");
+            };
+
+            wifi.NetworkConnected += (sender, args) =>
+            {
+                Resolver.Log.Info($"Joined network - IP Address: {args.IpAddress}");
                 _hardware.Display.ClearLines();
                 _hardware.Display.WriteLine("Joined network:", 0);
-                _hardware.Display.WriteLine($"IP Address:", 1);
-                _hardware.Display.WriteLine(networkAdapter.IpAddress.ToString(), 1);
-
-                return;
+                _hardware.Display.WriteLine("IP Address:", 1);
+                _hardware.Display.WriteLine(args.IpAddress.ToString(), 2);
             };
-            // disconnect event
-            wifi.NetworkDisconnected += (o, e) =>
-            {
-                Resolver.Log.Info($"Network disconnected.");
 
-                return;
+            wifi.NetworkDisconnected += (sender, args) =>
+            {
+                Resolver.Log.Info("Network disconnected.");
+                _hardware.Display.ClearLines();
+                _hardware.Display.Write("Disconnected");
+            };
+
+            wifi.NetworkConnectFailed += (sender) =>
+            {
+                Resolver.Log.Info("Could not connect to network");
+                _hardware.Display.ClearLines();
+                _hardware.Display.Write("Connect failed");
             };
         }
 
@@ -134,7 +188,7 @@ namespace CloudOStat.LocalHardware
             while (!_iotHubController.isAuthenticated)
             {
                 _hardware.Display.ClearLines();
-                _hardware.Display.Write("Connecting...");
+                _hardware.Display.Write("Connecting to Azure...");
 
                 bool authenticated = await _iotHubController.Initialize();
 

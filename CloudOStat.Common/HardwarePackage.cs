@@ -1,24 +1,25 @@
-﻿using CloudOStat.Drivers;
+﻿using CloudOStat.Common.Drivers;
 
 using Meadow.Devices;
 using Meadow.Foundation.Displays.Lcd;
 using Meadow.Foundation.Leds;
 using Meadow.Hardware;
+using Meadow.Peripherals.Displays;
 using Meadow.Peripherals.Leds;
 using Meadow.Units;
 
 namespace CloudOStat.LocalHardware
 {
-    public class Hardware
+    public class HardwarePackage : IHardwarePackage
     {
         public IDigitalOutputPort HeaterRelay { get; private set; }
-        public MAX31855 AirSensor { get; private set; }
-        public MAX31855 MeatSensor1 { get; private set; }
-        public MAX31855 MeatSensor2 { get; private set; }
-        public CharacterDisplay Display { get; private set; }
-        public RgbPwmLed OnboardLed { get; private set; }
+        public IMAX31855 AirSensor { get; private set; }
+        public IMAX31855 MeatSensor1 { get; private set; }
+        public IMAX31855 MeatSensor2 { get; private set; }
+        public ITextDisplay Display { get; private set; }
+        public IRgbPwmLed OnboardLed { get; private set; }
 
-        public Hardware(F7FeatherV1 device)
+        public HardwarePackage(F7FeatherV1 device)
         {
             var spiBus = device.CreateSpiBus();
             var pin0 = device.CreateDigitalOutputPort(device.Pins.D00);

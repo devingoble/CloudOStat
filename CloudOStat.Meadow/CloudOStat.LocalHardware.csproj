@@ -12,9 +12,9 @@
         <PackageReference Include="Meadow.Foundation" Version="*" />
     </ItemGroup>
     <ItemGroup>
-        <PackageReference Include="Meadow.Foundation.Displays.Lcd.CharacterDisplay" Version="1.11.0" />
+        <PackageReference Include="Meadow.Foundation.Displays.Lcd.CharacterDisplay" Version="2.5.0" />
         <PackageReference Include="System.Runtime" Version="4.3.1" />
-        <PackageReference Include="System.Text.Json" Version="8.0.3" />
+        <PackageReference Include="System.Text.Json" Version="10.0.2" />
     </ItemGroup>
     <ItemGroup>
         <None Update="desiredState.json">
@@ -29,5 +29,8 @@
         <None Include="app.config.yaml">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
+    </ItemGroup>
+    <ItemGroup>
+      <ProjectReference Include="..\CloudOStat.Common\CloudOStat.Common.csproj" />
     </ItemGroup>
 </Project>
