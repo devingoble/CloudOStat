@@ -1,0 +1,17 @@
+<Solution>
+  <Project Path="CloudOStat.App/CloudOStat.App.Shared/CloudOStat.App.Shared.csproj" />
+  <Project Path="CloudOStat.App/CloudOStat.App.Web.Client/CloudOStat.App.Web.Client.csproj" />
+  <Project Path="CloudOStat.App/CloudOStat.App.Web/CloudOStat.App.Web.csproj" />
+  <Project Path="CloudOStat.App/CloudOStat.App/CloudOStat.App.csproj">
+    <Deploy Solution="Debug|*" />
+  </Project>
+  <Project Path="CloudOStat.AppHost/CloudOStat.AppHost.csproj" Id="62cba9bc-8b87-4554-8b2a-96046dea8f5c" />
+  <Project Path="CloudOStat.Common/CloudOStat.Common.csproj" />
+  <Project Path="CloudOStat.Device/CloudOStat.Device.csproj">
+    <Deploy />
+  </Project>
+  <Project Path="CloudOStat.Meadow/CloudOStat.LocalHardware.csproj">
+    <Deploy />
+  </Project>
+  <Project Path="CloudOStat.ServiceDefaults/CloudOStat.ServiceDefaults.csproj" />
+</Solution>
