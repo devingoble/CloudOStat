@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 <Project Sdk="Microsoft.NET.Sdk.Razor">
-=======
-﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
->>>>>>> d0e7df298dbe9d9a97f11e4ef24ab94fff846518
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -15,11 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
-<<<<<<< HEAD
-    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.0" />
-=======
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
->>>>>>> d0e7df298dbe9d9a97f11e4ef24ab94fff846518
   </ItemGroup>
 
 </Project>

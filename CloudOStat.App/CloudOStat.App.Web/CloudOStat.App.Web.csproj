@@ -9,11 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\CloudOStat.ServiceDefaults\CloudOStat.ServiceDefaults.csproj" />
     <ProjectReference Include="..\CloudOStat.App.Web.Client\CloudOStat.App.Web.Client.csproj" />
-<<<<<<< HEAD
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.0" />
-=======
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
->>>>>>> d0e7df298dbe9d9a97f11e4ef24ab94fff846518
   </ItemGroup>
 
 </Project>
