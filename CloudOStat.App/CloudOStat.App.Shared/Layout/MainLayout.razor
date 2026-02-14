@@ -1,20 +1,38 @@
-﻿@inherits LayoutComponentBase
+﻿@inherits MainLayoutBase
 
-<div class="page">
-    <div class="sidebar">
+<MudThemeProvider Theme="CloudOStatTheme.SmokerEmber" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+<MudBreakpointProvider OnBreakpointChanged="HandleBreakpointChanged" />
+
+<MudLayout>
+    <MudAppBar Color="Color.Primary" Elevation="1">
+        @if (!_isDesktop)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="ToggleDrawer" />
+        }
+        <MudText Typo="Typo.h6">CloudOStat</MudText>
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen"
+               Variant="_drawerVariant"
+               Elevation="1"
+               Breakpoint="Breakpoint.Md">
         <NavMenu />
-    </div>
+    </MudDrawer>
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
-
-        <article class="content px-4">
+    <MudMainContent Class="@(_isMobile ? "layout-main layout-main-mobile" : "layout-main")">
+        <MudContainer MaxWidth="MaxWidth.False">
             @Body
-        </article>
-    </main>
-</div>
+        </MudContainer>
+    </MudMainContent>
+
+    @if (_isMobile)
+    {
+        <BottomNav />
+    }
+</MudLayout>
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.

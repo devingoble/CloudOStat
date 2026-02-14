@@ -10,6 +10,7 @@
     <ProjectReference Include="..\..\CloudOStat.ServiceDefaults\CloudOStat.ServiceDefaults.csproj" />
     <ProjectReference Include="..\CloudOStat.App.Web.Client\CloudOStat.App.Web.Client.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
+    <PackageReference Include="MudBlazor" />
   </ItemGroup>
 
 </Project>

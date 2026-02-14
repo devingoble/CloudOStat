@@ -1,0 +1,12 @@
+@inject NavigationService Nav
+
+<MudPaper Class="layout-bottom-nav" Elevation="6">
+    <MudBottomNavigation>
+        @foreach (var item in Nav.PrimaryNav)
+        {
+            <MudBottomNavigationItem Icon="@item.Icon"
+                                     Label="@item.Label"
+                                     OnClick="() => Nav.Navigate(item.Route)" />
+        }
+    </MudBottomNavigation>
+</MudPaper>

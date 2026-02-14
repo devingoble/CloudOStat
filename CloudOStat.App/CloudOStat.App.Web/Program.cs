@@ -1,6 +1,7 @@
 using CloudOStat.App.Web.Components;
 using CloudOStat.App.Shared.Services;
 using CloudOStat.App.Web.Services;
+using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,6 +11,9 @@ builder.AddServiceDefaults();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
     .AddInteractiveWebAssemblyComponents();
+
+builder.Services.AddMudServices();
+builder.Services.AddSingleton<NavigationService>();
 
 // Add device-specific services used by the CloudOStat.App.Shared project
 builder.Services.AddSingleton<IFormFactor, FormFactor>();

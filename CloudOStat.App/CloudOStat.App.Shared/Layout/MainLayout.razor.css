@@ -19,6 +19,7 @@ main {
     height: 3.5rem;
     display: flex;
     align-items: center;
+    padding: 0 1.5rem;
 }
 
     .top-row ::deep a, .top-row ::deep .btn-link {
@@ -36,9 +37,14 @@ main {
         text-overflow: ellipsis;
     }
 
+article {
+    padding: 1.1rem 1.5rem 0;
+}
+
 @media (max-width: 640.98px) {
     .top-row {
         justify-content: space-between;
+        padding: 0 1rem;
     }
 
     .top-row ::deep a, .top-row ::deep .btn-link {
@@ -90,9 +96,17 @@ main {
     z-index: 1000;
 }
 
-    #blazor-error-ui .dismiss {
-        cursor: pointer;
-        position: absolute;
-        right: 0.75rem;
-        top: 0.5rem;
-    }
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
+}
+
+.layout-main {
+    min-height: 100%;
+}
+
+.layout-main-mobile {
+    padding-bottom: calc(var(--bottom-nav-height, 56px) + env(safe-area-inset-bottom));
+}

@@ -9,6 +9,15 @@ public partial class App : Application
 
     protected override Window CreateWindow(IActivationState? activationState)
     {
-        return new Window(new MainPage()) { Title = "CloudOStat.App" };
+        var window = new Window(new MainPage()) { Title = "CloudOStat.App" };
+
+#if WINDOWS
+        window.Width = 1200;
+        window.Height = 800;
+        window.MinimumWidth = 900;
+        window.MinimumHeight = 600;
+#endif
+
+        return window;
     }
 }
