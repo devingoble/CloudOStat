@@ -1,0 +1,3 @@
+# CloudOStat Project Summary
+
+CloudOStat is a cross-platform temperature monitoring and control system for outdoor smokers/grills. It integrates a hardware layer (Meadow F7 Feather microcontroller with thermocouples and relay control) with multi-platform UI (MAUI desktop/mobile + Blazor web). The system monitors three temperature sensors (ambient air + two meat probes), controls a heater relay, and displays status on both a local character LCD and remote dashboards. Built on .NET 10 with centralized package management, it uses MudBlazor for unified theming and NavigationService for consistent cross-platform navigation.
