@@ -8,6 +8,7 @@ using System;
 using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using CloudOStat.LocalHardware;
@@ -20,7 +21,14 @@ internal class IoTHubMqttController : IIoTHubController
     string IOT_HUB_DEVICE_ID = Secrets.DEVICE_ID;
     string IOT_HUB_CONNECTION_STRING = Secrets.CONNECTION_STRING;
 
+    const int SasTokenExpiryMinutes = 60;
+    static readonly TimeSpan SasTokenRefreshBuffer = TimeSpan.FromMinutes(15);
+
     IMqttClient mqttClient;
+    readonly SemaphoreSlim _connectionLock = new(1, 1);
+    string _iotHubUri;
+    string _username;
+    DateTimeOffset _sasTokenExpiryUtc;
 
     public bool isAuthenticated { get; private set; }
 
@@ -29,7 +37,7 @@ internal class IoTHubMqttController : IIoTHubController
     /// <summary>
     /// Generates a SAS token from the IoT Hub connection string
     /// </summary>
-    private string GenerateSasToken(int expiryMinutes = 60)
+    private string GenerateSasToken(out DateTimeOffset expiryUtc, int expiryMinutes = SasTokenExpiryMinutes)
     {
         try
         {
@@ -74,7 +82,8 @@ internal class IoTHubMqttController : IIoTHubController
             Resolver.Log.Info($"DEBUG: Encoded Resource URI: {encodedResourceUri}");
 
             // Calculate expiry (Unix timestamp)
-            var expiryTime = DateTimeOffset.UtcNow.AddMinutes(expiryMinutes).ToUnixTimeSeconds();
+            expiryUtc = DateTimeOffset.UtcNow.AddMinutes(expiryMinutes);
+            var expiryTime = expiryUtc.ToUnixTimeSeconds();
             Resolver.Log.Info($"DEBUG: Expiry time: {expiryTime}");
 
             // Create the signature string with URL-encoded resource URI
@@ -103,55 +112,95 @@ internal class IoTHubMqttController : IIoTHubController
         }
     }
 
-    public async Task<bool> Initialize()
+    private MqttClientOptions BuildMqttOptions()
     {
+        Resolver.Log.Info("Generating SAS token...");
+        var sasToken = GenerateSasToken(out var expiryUtc);
+        _sasTokenExpiryUtc = expiryUtc;
+
+        Resolver.Log.Info("Creating MQTT options ...");
+        return new MqttClientOptionsBuilder()
+            .WithClientId(IOT_HUB_DEVICE_ID)
+            .WithTcpServer(_iotHubUri, 8883)
+            .WithCredentials(_username, sasToken)
+            .WithProtocolVersion(MQTTnet.Formatter.MqttProtocolVersion.V311)
+            .WithTlsOptions(o =>
+            {
+                o.UseTls();
+                o.WithSslProtocols(SslProtocols.Tls12);
+
+                // Allow connection without certificate validation
+                // This is necessary for embedded devices like Meadow that may not have
+                // the root CA certificates installed
+                o.WithCertificateValidationHandler(context =>
+                {
+                    // Log certificate info for debugging
+                    if (context.Certificate != null)
+                    {
+                        Resolver.Log.Info($"Certificate Subject: {context.Certificate.Subject}");
+                        Resolver.Log.Info($"Certificate Issuer: {context.Certificate.Issuer}");
+                    }
+
+                    // Accept the certificate
+                    return true;
+                });
+            })
+            .Build();
+    }
+
+    private bool IsSasTokenExpiringSoon()
+    {
+        return _sasTokenExpiryUtc != default && _sasTokenExpiryUtc <= DateTimeOffset.UtcNow.Add(SasTokenRefreshBuffer);
+    }
+
+    private async Task<bool> EnsureConnectedAsync()
+    {
+        if (mqttClient != null && mqttClient.IsConnected)
+        {
+            if (IsSasTokenExpiringSoon())
+            {
+                Resolver.Log.Info("SAS token is expiring soon, reconnecting...");
+                await mqttClient.DisconnectAsync();
+                isAuthenticated = false;
+            }
+            else
+            {
+                return true;
+            }
+        }
+
+        await _connectionLock.WaitAsync();
         try
         {
-            Resolver.Log.Info("Create connection factory...");
-            var factory = new MqttFactory();
+            if (mqttClient == null)
+            {
+                Resolver.Log.Info("Create connection factory...");
+                var factory = new MqttFactory();
 
-            Resolver.Log.Info("Create MQTT client...");
-            mqttClient = factory.CreateMqttClient();
-
-            var iotHubUri = $"{IOT_HUB_NAME}.azure-devices.net";
-
-            var username = $"{IOT_HUB_NAME}.azure-devices.net/{IOT_HUB_DEVICE_ID}/?api-version=2021-04-12";
-
-            Resolver.Log.Info("Generating SAS token...");
-            var sasToken = GenerateSasToken();
-
-            Resolver.Log.Info("Creating MQTT options ...");
-            var options = new MqttClientOptionsBuilder()
-                .WithClientId(IOT_HUB_DEVICE_ID)
-                .WithTcpServer(iotHubUri, 8883)
-                .WithCredentials(username, sasToken)
-                .WithProtocolVersion(MQTTnet.Formatter.MqttProtocolVersion.V311)
-                .WithTlsOptions(o =>
+                Resolver.Log.Info("Create MQTT client...");
+                mqttClient = factory.CreateMqttClient();
+                mqttClient.DisconnectedAsync += args =>
                 {
-                    o.UseTls();
-                    o.WithSslProtocols(SslProtocols.Tls12);
-                    
-                    // Allow connection without certificate validation
-                    // This is necessary for embedded devices like Meadow that may not have
-                    // the root CA certificates installed
-                    o.WithCertificateValidationHandler(context =>
-                    {
-                        // Log certificate info for debugging
-                        if (context.Certificate != null)
-                        {
-                            Resolver.Log.Info($"Certificate Subject: {context.Certificate.Subject}");
-                            Resolver.Log.Info($"Certificate Issuer: {context.Certificate.Issuer}");
-                        }
-                        
-                        // Accept the certificate
-                        return true;
-                    });
-                })
-                .Build();
+                    isAuthenticated = false;
+                    Resolver.Log.Info($"MQTT disconnected: {args.ReasonString}");
+                    return Task.CompletedTask;
+                };
+            }
 
+            if (string.IsNullOrWhiteSpace(_iotHubUri))
+            {
+                _iotHubUri = $"{IOT_HUB_NAME}.azure-devices.net";
+            }
+
+            if (string.IsNullOrWhiteSpace(_username))
+            {
+                _username = $"{IOT_HUB_NAME}.azure-devices.net/{IOT_HUB_DEVICE_ID}/?api-version=2021-04-12";
+            }
+
+            var options = BuildMqttOptions();
 
             Resolver.Log.Info("Azure Connecting...");
-            await mqttClient.ConnectAsync(options, new System.Threading.CancellationToken());
+            await mqttClient.ConnectAsync(options, CancellationToken.None);
 
             isAuthenticated = true;
             return true;
@@ -162,12 +211,29 @@ internal class IoTHubMqttController : IIoTHubController
             isAuthenticated = false;
             return false;
         }
+        finally
+        {
+            _connectionLock.Release();
+        }
+    }
+
+    public async Task<bool> Initialize()
+    {
+        _iotHubUri = $"{IOT_HUB_NAME}.azure-devices.net";
+        _username = $"{IOT_HUB_NAME}.azure-devices.net/{IOT_HUB_DEVICE_ID}/?api-version=2021-04-12";
+
+        return await EnsureConnectedAsync();
     }
 
     public async Task SendEnvironmentalReading(Temperature meatOne, Temperature meatTwo, Temperature air)
     {
         try
         {
+            if (!await EnsureConnectedAsync())
+            {
+                return;
+            }
+
             Resolver.Log.Info("Create payload");
 
             string messagePayload = $"" +
@@ -198,6 +264,11 @@ internal class IoTHubMqttController : IIoTHubController
     {
         try
         {
+            if (!await EnsureConnectedAsync())
+            {
+                return;
+            }
+
             Resolver.Log.Info($"Creating batch payload with {readings.Count} readings");
 
             // Build JSON array of readings

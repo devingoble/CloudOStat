@@ -7,9 +7,12 @@
   </Project>
   <Project Path="CloudOStat.AppHost/CloudOStat.AppHost.csproj" Id="62cba9bc-8b87-4554-8b2a-96046dea8f5c" />
   <Project Path="CloudOStat.Common/CloudOStat.Common.csproj" />
+<<<<<<< HEAD
   <Project Path="CloudOStat.Device/CloudOStat.Device.csproj">
     <Deploy />
   </Project>
+=======
+>>>>>>> d0e7df298dbe9d9a97f11e4ef24ab94fff846518
   <Project Path="CloudOStat.Meadow/CloudOStat.LocalHardware.csproj">
     <Deploy />
   </Project>

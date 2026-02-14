@@ -1,0 +1,25 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.Maui.Controls" Version="10.0.40" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="10.0.40" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.Web" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.3" />
+    <PackageVersion Include="Meadow.F7" Version="2.5.0" />
+    <PackageVersion Include="Meadow.Foundation" Version="2.5.0" />
+    <PackageVersion Include="Meadow.Foundation.Displays.Lcd.CharacterDisplay" Version="2.5.0" />
+    <PackageVersion Include="System.Runtime" Version="4.3.1" />
+    <PackageVersion Include="System.Text.Json" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.3.0" />
+    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.3.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.15.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.15.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.0" />
+  </ItemGroup>
+</Project>

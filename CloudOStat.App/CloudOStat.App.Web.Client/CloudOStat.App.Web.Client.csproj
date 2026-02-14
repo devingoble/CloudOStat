@@ -9,7 +9,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+<<<<<<< HEAD
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.0" />
+=======
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+>>>>>>> d0e7df298dbe9d9a97f11e4ef24ab94fff846518
   </ItemGroup>
 
   <ItemGroup>
