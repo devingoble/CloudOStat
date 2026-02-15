@@ -1,12 +1,15 @@
+@using MudBlazor
 @inject NavigationService Nav
 
 <MudPaper Class="layout-bottom-nav" Elevation="6">
-    <MudBottomNavigation>
+    <MudStack Row="true" Justify="Justify.SpaceAround" Class="pa-2">
         @foreach (var item in Nav.PrimaryNav)
         {
-            <MudBottomNavigationItem Icon="@item.Icon"
-                                     Label="@item.Label"
-                                     OnClick="() => Nav.Navigate(item.Route)" />
+            <MudStack AlignItems="AlignItems.Center" Spacing="1" Style="cursor: pointer; min-width: 64px;"
+                      @onclick="() => Nav.Navigate(item.Route)">
+                <MudIcon Icon="@item.Icon" Color="Color.Primary" />
+                <MudText Typo="Typo.caption" Align="Align.Center">@item.Label</MudText>
+            </MudStack>
         }
-    </MudBottomNavigation>
+    </MudStack>
 </MudPaper>

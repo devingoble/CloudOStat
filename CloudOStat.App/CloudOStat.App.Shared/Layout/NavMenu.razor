@@ -1,8 +1,5 @@
 ﻿@inject NavigationService Nav
 
-<MudText Typo="Typo.h6" Class="mud-px-4 mud-py-3">CloudOStat</MudText>
-<MudDivider />
-
 <MudNavMenu>
     @foreach (var item in Nav.PrimaryNav)
     {
@@ -10,14 +7,5 @@
             @item.Label
         </MudNavLink>
     }
-
-    <MudNavGroup Text="More" Icon="@Icons.Material.Filled.MoreHoriz">
-        @foreach (var item in Nav.SecondaryNav)
-        {
-            <MudNavLink Href="@item.Route" Match="@(item.MatchAll ? NavLinkMatch.All : NavLinkMatch.Prefix)" Icon="@item.Icon">
-                @item.Label
-            </MudNavLink>
-        }
-    </MudNavGroup>
 </MudNavMenu>
 

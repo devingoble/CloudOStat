@@ -28,7 +28,20 @@ public static class MauiProgram
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();
         builder.Logging.AddDebug();
+        builder.Logging.SetMinimumLevel(LogLevel.Debug);
+        
+        // Filter out known MudBlazor JSInterop warnings in MAUI
+        builder.Logging.AddFilter("Microsoft.AspNetCore.Components.RenderTree.Renderer", (level) =>
+        {
+            // Allow errors but suppress the mudElementRef ones in the error handler
+            return level >= LogLevel.Warning;
+        });
+#else
+        builder.Logging.SetMinimumLevel(LogLevel.Warning);
 #endif
+
+        // Configure logging to capture errors but reduce noise
+        builder.Logging.AddFilter("Microsoft.AspNetCore.Components.RenderTree", LogLevel.Warning);
 
         return builder.Build();
     }

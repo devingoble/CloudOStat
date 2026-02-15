@@ -24,3 +24,19 @@ h1:focus {
 .blazor-error-boundary::after {
     content: "An error has occurred.";
 }
+
+/* MudBlazor Navigation Icon Color Overrides */
+/* Override default #616161 with theme colors */
+.mud-nav-link .mud-nav-link-icon-default,
+.mud-nav-link .mud-icon-root {
+    color: #F7F3EE !important;
+}
+
+.mud-nav-link.active .mud-nav-link-icon-default,
+.mud-nav-link.active .mud-icon-root {
+    color: #B33F1C !important;
+}
+
+.mud-nav-group .mud-icon-root {
+    color: #F7F3EE !important;
+}
