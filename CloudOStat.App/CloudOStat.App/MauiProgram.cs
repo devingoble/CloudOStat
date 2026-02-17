@@ -22,6 +22,7 @@ public static class MauiProgram
 
         // Add device-specific services used by the CloudOStat.App.Shared project
         builder.Services.AddSingleton<IFormFactor, FormFactor>();
+        builder.Services.AddSingleton<IDeviceControlService, DeviceControlService>();
 
         builder.Services.AddMauiBlazorWebView();
 

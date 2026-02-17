@@ -18,6 +18,9 @@ builder.Services.AddSingleton<NavigationService>();
 // Add device-specific services used by the CloudOStat.App.Shared project
 builder.Services.AddSingleton<IFormFactor, FormFactor>();
 
+// Add controllers for API endpoints
+builder.Services.AddControllers();
+
 var app = builder.Build();
 
 app.MapDefaultEndpoints();
@@ -39,6 +42,9 @@ app.UseHttpsRedirection();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+
+// Map API controllers
+app.MapControllers();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()

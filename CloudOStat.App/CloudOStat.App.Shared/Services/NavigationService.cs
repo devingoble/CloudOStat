@@ -20,6 +20,7 @@ public class NavigationService
     [
         new NavItem("Home", Icons.Material.Filled.Home, "/", true),
         new NavItem("Dashboard", Icons.Material.Filled.Dashboard, "/dashboard"),
+        new NavItem("Device Control", Icons.Material.Filled.Settings, "/device-control"),
         new NavItem("Settings", Icons.Material.Filled.Settings, "/settings")
     ];
 

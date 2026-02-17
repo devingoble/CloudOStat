@@ -1,0 +1,218 @@
+@page "/device-control"
+@using CloudOStat.App.Shared.Services
+@inject IDeviceControlService DeviceControlService
+@inject ISnackbar Snackbar
+
+<PageTitle>Device Control</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-6">
+    <MudPaper Class="pa-6">
+        <MudText Typo="Typo.h4" Class="mb-4">Device Control</MudText>
+
+        @if (_isLoading)
+        {
+            <MudProgressLinear Class="mb-4" Indeterminate="true" />
+            <MudText>Loading device status...</MudText>
+        }
+        else if (_deviceStatus == null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">
+                Unable to load device status. Please check your connection.
+            </MudAlert>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="RefreshStatus" Class="mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.Refresh" Class="mr-2" />
+                <MudText>Refresh</MudText>
+            </MudButton>
+        }
+        else
+        {
+            <!-- Device Status Display -->
+            <MudCard Class="mb-6">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Current Device Status</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudGrid>
+                        <MudItem xs="12" sm="6">
+                            <MudText Typo="Typo.caption">Air Temperature</MudText>
+                            <MudText Typo="Typo.h6">
+                                @if (_deviceStatus.AirTemperature.HasValue)
+                                {
+                                    @($"{_deviceStatus.AirTemperature:F2}°F")
+                                }
+                                else
+                                {
+                                    <span>N/A</span>
+                                }
+                            </MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudText Typo="Typo.caption">Meat Probe 1</MudText>
+                            <MudText Typo="Typo.h6">
+                                @if (_deviceStatus.Meat1Temperature.HasValue)
+                                {
+                                    @($"{_deviceStatus.Meat1Temperature:F2}°F")
+                                }
+                                else
+                                {
+                                    <span>N/A</span>
+                                }
+                            </MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudText Typo="Typo.caption">Meat Probe 2</MudText>
+                            <MudText Typo="Typo.h6">
+                                @if (_deviceStatus.Meat2Temperature.HasValue)
+                                {
+                                    @($"{_deviceStatus.Meat2Temperature:F2}°F")
+                                }
+                                else
+                                {
+                                    <span>N/A</span>
+                                }
+                            </MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudText Typo="Typo.caption">Device Status</MudText>
+                            <MudText Typo="Typo.h6">@(_deviceStatus.Status ?? "Unknown")</MudText>
+                        </MudItem>
+                    </MudGrid>
+                    
+                    <MudDivider Class="my-4" />
+                    
+                    <MudText Typo="Typo.caption">
+                        Last Updated: @(_deviceStatus.LastUpdate?.ToString("g") ?? "Never")
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+
+            <!-- Telemetry Interval Control -->
+            <MudCard>
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Telemetry Reporting Interval</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudText Typo="Typo.body2" Class="mb-4">
+                        Current interval: <strong>@(_deviceStatus.TelemetryIntervalSeconds ?? 0) seconds</strong>
+                    </MudText>
+
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Set New Interval</MudText>
+                    <MudSlider @bind-Value="_newTelemetryInterval" 
+                               Min="@DeviceControlService.GetTelemetryIntervalRange().MinSeconds" 
+                               Max="@DeviceControlService.GetTelemetryIntervalRange().MaxSeconds"
+                               Step="5"
+                               Class="mb-4">
+                        <MudText Typo="Typo.body2">@_newTelemetryInterval seconds</MudText>
+                    </MudSlider>
+
+                    <MudText Typo="Typo.caption" Class="mb-4">
+                        Valid range: @DeviceControlService.GetTelemetryIntervalRange().MinSeconds - @DeviceControlService.GetTelemetryIntervalRange().MaxSeconds seconds
+                    </MudText>
+
+                    <MudButton Variant="Variant.Filled" 
+                               Color="Color.Primary" 
+                               OnClick="UpdateTelemetryInterval"
+                               Disabled="_isUpdating">
+                        @if (_isUpdating)
+                        {
+                            <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                            <MudText Class="ms-2">Updating...</MudText>
+                        }
+                        else
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-2" />
+                            <MudText>Update Interval</MudText>
+                        }
+                    </MudButton>
+                </MudCardContent>
+            </MudCard>
+        }
+
+        <MudButton Variant="Variant.Text" 
+                   Color="Color.Primary" 
+                   OnClick="RefreshStatus" 
+                   Class="mt-4"
+                   Disabled="_isLoading || _isUpdating">
+            <MudIcon Icon="@Icons.Material.Filled.Refresh" Class="mr-2" />
+            <MudText>Refresh Status</MudText>
+        </MudButton>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private DeviceStatus? _deviceStatus;
+    private int _newTelemetryInterval;
+    private bool _isLoading = true;
+    private bool _isUpdating = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshStatus();
+    }
+
+    private async Task RefreshStatus()
+    {
+        _isLoading = true;
+        try
+        {
+            _deviceStatus = await DeviceControlService.GetDeviceStatusAsync();
+            
+            if (_deviceStatus != null && _deviceStatus.TelemetryIntervalSeconds.HasValue)
+            {
+                _newTelemetryInterval = _deviceStatus.TelemetryIntervalSeconds.Value;
+            }
+            else
+            {
+                var range = DeviceControlService.GetTelemetryIntervalRange();
+                _newTelemetryInterval = 20; // Default value
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading device status: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task UpdateTelemetryInterval()
+    {
+        if (!DeviceControlService.IsValidTelemetryInterval(_newTelemetryInterval))
+        {
+            var range = DeviceControlService.GetTelemetryIntervalRange();
+            Snackbar.Add($"Invalid interval. Must be between {range.MinSeconds} and {range.MaxSeconds} seconds.", Severity.Warning);
+            return;
+        }
+
+        _isUpdating = true;
+        try
+        {
+            var response = await DeviceControlService.UpdateTelemetryIntervalAsync(_newTelemetryInterval);
+            
+            if (response.Success)
+            {
+                Snackbar.Add($"✓ {response.Message}", Severity.Success);
+                await Task.Delay(1000); // Brief delay before refreshing
+                await RefreshStatus();
+            }
+            else
+            {
+                Snackbar.Add($"✗ {response.Message}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error updating interval: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isUpdating = false;
+        }
+    }
+}

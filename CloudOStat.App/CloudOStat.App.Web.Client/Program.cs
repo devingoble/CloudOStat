@@ -11,4 +11,10 @@ builder.Services.AddSingleton<NavigationService>();
 // Add device-specific services used by the CloudOStat.App.Shared project
 builder.Services.AddSingleton<IFormFactor, FormFactor>();
 
+// Add HttpClient for DeviceControlService
+builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
+
+// Add DeviceControlService that communicates with backend API
+builder.Services.AddScoped<IDeviceControlService>(sp => new DeviceControlService(sp.GetRequiredService<HttpClient>()));
+
 await builder.Build().RunAsync();
