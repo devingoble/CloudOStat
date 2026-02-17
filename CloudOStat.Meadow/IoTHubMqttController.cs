@@ -8,6 +8,7 @@ using System;
 using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -29,8 +30,11 @@ internal class IoTHubMqttController : IIoTHubController
     string _iotHubUri;
     string _username;
     DateTimeOffset _sasTokenExpiryUtc;
+    int _desiredPropertiesVersion = 0;
 
     public bool isAuthenticated { get; private set; }
+
+    public event EventHandler<DeviceTwinDesiredPropertiesEventArgs>? DesiredPropertiesReceived;
 
     public IoTHubMqttController() { }
 
@@ -185,6 +189,8 @@ internal class IoTHubMqttController : IIoTHubController
                     Resolver.Log.Info($"MQTT disconnected: {args.ReasonString}");
                     return Task.CompletedTask;
                 };
+
+                await SetupMessageHandlerAsync();
             }
 
             if (string.IsNullOrWhiteSpace(_iotHubUri))
@@ -201,6 +207,9 @@ internal class IoTHubMqttController : IIoTHubController
 
             Resolver.Log.Info("Azure Connecting...");
             await mqttClient.ConnectAsync(options, CancellationToken.None);
+
+            // Subscribe to device twin topics after successful connection
+            await SubscribeToDesiredPropertiesAsync();
 
             isAuthenticated = true;
             return true;
@@ -310,6 +319,133 @@ internal class IoTHubMqttController : IIoTHubController
         catch (Exception ex)
         {
             Resolver.Log.Info($"-- Batch D2C Error - {ex.Message} --");
+        }
+    }
+
+    private async Task SubscribeToDesiredPropertiesAsync()
+    {
+        try
+        {
+            if (mqttClient == null || !mqttClient.IsConnected)
+            {
+                return;
+            }
+
+            Resolver.Log.Info("Subscribing to device twin desired properties topic...");
+            
+            // Subscribe to desired property changes
+            var topicFilter = new MqttTopicFilterBuilder()
+                .WithTopic($"$iothub/twin/PATCH/properties/desired/#")
+                .Build();
+
+            await mqttClient.SubscribeAsync(topicFilter);
+            Resolver.Log.Info("Successfully subscribed to desired properties topic");
+        }
+        catch (Exception ex)
+        {
+            Resolver.Log.Error($"Failed to subscribe to desired properties: {ex.Message}");
+        }
+    }
+
+    private async Task SetupMessageHandlerAsync()
+    {
+        if (mqttClient == null)
+        {
+            return;
+        }
+
+        mqttClient.ApplicationMessageReceivedAsync += async args =>
+        {
+            try
+            {
+                if (args.ApplicationMessage.Topic.StartsWith("$iothub/twin/PATCH/properties/desired/"))
+                {
+                    await HandleDesiredPropertyUpdateAsync(args.ApplicationMessage);
+                }
+            }
+            catch (Exception ex)
+            {
+                Resolver.Log.Error($"Error handling MQTT message: {ex.Message}");
+            }
+        };
+    }
+
+    private async Task HandleDesiredPropertyUpdateAsync(MqttApplicationMessage message)
+    {
+        try
+        {
+            var payload = Encoding.UTF8.GetString(message.PayloadSegment);
+            Resolver.Log.Info($"Received desired properties: {payload}");
+
+            var jsonDocument = JsonDocument.Parse(payload);
+            var root = jsonDocument.RootElement;
+
+            // Extract the desired properties
+            var desired = new DeviceTwinProperties.Desired();
+
+            if (root.TryGetProperty("telemetry_interval_seconds", out var intervalProp))
+            {
+                if (intervalProp.TryGetInt32(out int interval))
+                {
+                    desired.TelemetryIntervalSeconds = interval;
+                }
+            }
+
+            if (root.TryGetProperty("$version", out var versionProp))
+            {
+                if (versionProp.TryGetInt32(out int version))
+                {
+                    desired.Version = version;
+                    _desiredPropertiesVersion = version;
+                }
+            }
+
+            Resolver.Log.Info($"Parsed desired properties - Telemetry interval: {desired.TelemetryIntervalSeconds}s, Version: {desired.Version}");
+
+            // Raise the event for the application to handle
+            DesiredPropertiesReceived?.Invoke(this, new DeviceTwinDesiredPropertiesEventArgs(desired, desired.Version));
+        }
+        catch (Exception ex)
+        {
+            Resolver.Log.Error($"Failed to parse desired properties: {ex.Message}");
+        }
+    }
+
+    public async Task UpdateReportedPropertiesAsync(DeviceTwinProperties.Reported reportedProperties)
+    {
+        try
+        {
+            if (!await EnsureConnectedAsync())
+            {
+                return;
+            }
+
+            // Increment version for reported properties
+            var reportedWithVersion = new
+            {
+                air_temperature = reportedProperties.AirTemperature,
+                meat1_temperature = reportedProperties.Meat1Temperature,
+                meat2_temperature = reportedProperties.Meat2Temperature,
+                device_status = reportedProperties.DeviceStatus,
+                telemetry_interval_seconds = reportedProperties.TelemetryIntervalSeconds,
+                last_update = reportedProperties.LastUpdate?.ToString("O")
+            };
+
+            var jsonPayload = JsonSerializer.Serialize(reportedWithVersion);
+            Resolver.Log.Info($"Updating reported properties: {jsonPayload}");
+
+            var mqttMessage = new MqttApplicationMessageBuilder()
+                .WithTopic($"$iothub/twin/PATCH/properties/reported/")
+                .WithPayload(jsonPayload)
+                .Build();
+
+            await mqttClient.PublishAsync(mqttMessage, CancellationToken.None);
+
+            Resolver.Log.Info($"*** MQTT - REPORTED PROPERTIES SENT ***");
+        }
+        catch (Exception ex)
+        {
+            Resolver.Log.Error($"-- Failed to update reported properties - {ex.Message} --");
         }
     }
 }

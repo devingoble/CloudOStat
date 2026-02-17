@@ -17,9 +17,6 @@
         <PackageReference Include="System.Text.Json" />
     </ItemGroup>
     <ItemGroup>
-        <None Update="desiredState.json">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
         <None Update="meadow.config.yaml">
           <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>

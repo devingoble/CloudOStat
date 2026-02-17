@@ -20,8 +20,8 @@ namespace CloudOStat.LocalHardware
         HeatingElementController _controller;
         IIoTHubController _iotHubController;
 
-        // Configurable IoT Hub send interval (in milliseconds)
-        const int IOT_HUB_SEND_INTERVAL_MS = 20000; // 20 seconds
+        // Configurable IoT Hub send interval (in milliseconds) - now mutable for device twin updates
+        private int _iotHubSendIntervalMs = 20000; // 20 seconds default
         const int DISPLAY_REFRESH_INTERVAL_MS = 5000; // 5 seconds
 
         // Collection to store readings for batching
@@ -34,7 +34,42 @@ namespace CloudOStat.LocalHardware
             await InitWiFi();
 
             _iotHubController = new IoTHubMqttController();
+            
+            // Subscribe to device twin desired property changes
+            _iotHubController.DesiredPropertiesReceived += OnDesiredPropertiesReceived;
+            
             await InitializeIoTHub();
+        }
+
+        private void OnDesiredPropertiesReceived(object? sender, DeviceTwinDesiredPropertiesEventArgs args)
+        {
+            try
+            {
+                if (args.DesiredProperties.TelemetryIntervalSeconds.HasValue)
+                {
+                    int newIntervalSeconds = args.DesiredProperties.TelemetryIntervalSeconds.Value;
+                    
+                    // Validate the interval is reasonable (at least 5 seconds, at most 5 minutes)
+                    if (newIntervalSeconds >= 5 && newIntervalSeconds <= 300)
+                    {
+                        int newIntervalMs = newIntervalSeconds * 1000;
+                        Resolver.Log.Info($"Updating telemetry interval from {_iotHubSendIntervalMs}ms to {newIntervalMs}ms");
+                        _iotHubSendIntervalMs = newIntervalMs;
+                        
+                        // Display the change on the device
+                        _hardware.Display.ClearLines();
+                        _hardware.Display.WriteLine($"Interval updated to {newIntervalSeconds}s", 0);
+                    }
+                    else
+                    {
+                        Resolver.Log.Warn($"Rejecting invalid telemetry interval: {newIntervalSeconds}s (must be 5-300s)");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Resolver.Log.Error($"Error handling desired properties: {ex.Message}");
+            }
         }
 
         public override Task Run()
@@ -110,18 +145,31 @@ namespace CloudOStat.LocalHardware
 
                 // Only send to IoT Hub at the configured interval
                 var timeSinceLastSend = DateTime.UtcNow - lastIoTHubSend;
-                if (timeSinceLastSend.TotalMilliseconds >= IOT_HUB_SEND_INTERVAL_MS)
+                if (timeSinceLastSend.TotalMilliseconds >= _iotHubSendIntervalMs)
                 {
                     // Send the entire batch
                     if (_readingsBatch.Count > 0)
                     {
                         _iotHubController.SendBatchEnvironmentalReadings(_readingsBatch);
                         
-                        Resolver.Log.Info($"IoT Hub batch sent with {_readingsBatch.Count} readings. Next batch in {IOT_HUB_SEND_INTERVAL_MS / 1000} seconds.");
+                        Resolver.Log.Info($"IoT Hub batch sent with {_readingsBatch.Count} readings. Next batch in {_iotHubSendIntervalMs / 1000} seconds.");
                         
                         // Clear the batch after sending
                         _readingsBatch.Clear();
                     }
+                    
+                    // Update reported properties with current device state
+                    var reportedProperties = new DeviceTwinProperties.Reported
+                    {
+                        AirTemperature = Math.Round(airValue, 2),
+                        Meat1Temperature = Math.Round(meat1Value, 2),
+                        Meat2Temperature = Math.Round(meat2Value, 2),
+                        DeviceStatus = status,
+                        TelemetryIntervalSeconds = _iotHubSendIntervalMs / 1000,
+                        LastUpdate = DateTime.UtcNow
+                    };
+                    
+                    _ = _iotHubController.UpdateReportedPropertiesAsync(reportedProperties);
                     
                     lastIoTHubSend = DateTime.UtcNow;
                 }

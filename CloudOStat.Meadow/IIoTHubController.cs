@@ -1,4 +1,5 @@
 ﻿using Meadow.Units;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using CloudOStat.LocalHardware;
@@ -26,4 +27,29 @@ internal interface IIoTHubController
     Task SendEnvironmentalReading(Temperature meatOne, Temperature meatTwo, Temperature air);
 
     Task SendBatchEnvironmentalReadings(List<TemperatureReading> readings);
+
+    /// <summary>
+    /// Updates the reported properties of the device twin with current sensor readings and status
+    /// </summary>
+    Task UpdateReportedPropertiesAsync(DeviceTwinProperties.Reported reportedProperties);
+
+    /// <summary>
+    /// Event raised when desired properties are received from Azure IoT Hub
+    /// </summary>
+    event EventHandler<DeviceTwinDesiredPropertiesEventArgs>? DesiredPropertiesReceived;
+}
+
+/// <summary>
+/// Event arguments for device twin desired properties received event
+/// </summary>
+public class DeviceTwinDesiredPropertiesEventArgs : EventArgs
+{
+    public DeviceTwinProperties.Desired DesiredProperties { get; set; }
+    public int? Version { get; set; }
+
+    public DeviceTwinDesiredPropertiesEventArgs(DeviceTwinProperties.Desired desiredProperties, int? version)
+    {
+        DesiredProperties = desiredProperties;
+        Version = version;
+    }
 }
