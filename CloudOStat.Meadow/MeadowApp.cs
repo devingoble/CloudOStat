@@ -20,9 +20,12 @@ namespace CloudOStat.LocalHardware
         HeatingElementController _controller;
         IIoTHubController _iotHubController;
 
-        // Configurable IoT Hub send interval (in milliseconds) - now mutable for device twin updates
-        private int _iotHubSendIntervalMs = 20000; // 20 seconds default
+        // Configurable IoT Hub send interval (in milliseconds) - can be updated via Device Twin
+        private int _iotHubSendIntervalMs = 20000; // Default: 20 seconds
         const int DISPLAY_REFRESH_INTERVAL_MS = 5000; // 5 seconds
+        const int MAX_BATCH_SIZE = 100;
+        const int MIN_TELEMETRY_INTERVAL_SECONDS = 5;
+        const int MAX_TELEMETRY_INTERVAL_SECONDS = 300;
 
         // Collection to store readings for batching
         private readonly List<TemperatureReading> _readingsBatch = new List<TemperatureReading>();
@@ -35,46 +38,19 @@ namespace CloudOStat.LocalHardware
 
             _iotHubController = new IoTHubMqttController();
             
-            // Subscribe to device twin desired property changes
+            // Subscribe to Device Twin desired properties updates
             _iotHubController.DesiredPropertiesReceived += OnDesiredPropertiesReceived;
             
             await InitializeIoTHub();
         }
 
-        private void OnDesiredPropertiesReceived(object? sender, DeviceTwinDesiredPropertiesEventArgs args)
-        {
-            try
-            {
-                if (args.DesiredProperties.TelemetryIntervalSeconds.HasValue)
-                {
-                    int newIntervalSeconds = args.DesiredProperties.TelemetryIntervalSeconds.Value;
-                    
-                    // Validate the interval is reasonable (at least 5 seconds, at most 5 minutes)
-                    if (newIntervalSeconds >= 5 && newIntervalSeconds <= 300)
-                    {
-                        int newIntervalMs = newIntervalSeconds * 1000;
-                        Resolver.Log.Info($"Updating telemetry interval from {_iotHubSendIntervalMs}ms to {newIntervalMs}ms");
-                        _iotHubSendIntervalMs = newIntervalMs;
-                        
-                        // Display the change on the device
-                        _hardware.Display.ClearLines();
-                        _hardware.Display.WriteLine($"Interval updated to {newIntervalSeconds}s", 0);
-                    }
-                    else
-                    {
-                        Resolver.Log.Warn($"Rejecting invalid telemetry interval: {newIntervalSeconds}s (must be 5-300s)");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Resolver.Log.Error($"Error handling desired properties: {ex.Message}");
-            }
-        }
-
-        public override Task Run()
+        public async override Task Run()
         {
             DateTime lastIoTHubSend = DateTime.MinValue;
+            string lastStatus = "";
+            double lastAirValue = 0;
+            double lastMeat1Value = 0;
+            double lastMeat2Value = 0;
 
             while (true)
             {
@@ -82,99 +58,141 @@ namespace CloudOStat.LocalHardware
                 var meat1Value = _hardware.MeatSensor1.GetProbeTemperatureDataFahrenheit();
                 var meat2Value = _hardware.MeatSensor2.GetProbeTemperatureDataFahrenheit();
                 string status = "";
+                string errorMessage = "";
 
                 try
                 {
                     airValue = _hardware.AirSensor.GetProbeTemperatureDataFahrenheit();
                 }
-                catch (Exception ex)
+                catch (InvalidOperationException ex)
                 {
                     status = "air:" + ex.Message;
+                    errorMessage = status;
                 }
 
                 try
                 {
                     meat1Value = _hardware.MeatSensor1.GetProbeTemperatureDataFahrenheit();
                 }
-                catch (Exception ex)
+                catch (InvalidOperationException ex)
                 {
                     status += " 1:" + ex.Message;
+                    errorMessage = string.IsNullOrWhiteSpace(errorMessage) ? status : $"{errorMessage} {status}";
                 }
 
                 try
                 {
                     meat2Value = _hardware.MeatSensor2.GetProbeTemperatureDataFahrenheit();
                 }
-                catch (Exception ex)
+                catch (InvalidOperationException ex)
                 {
                     status += " 2:" + ex.Message;
+                    errorMessage = string.IsNullOrWhiteSpace(errorMessage) ? status : $"{errorMessage} {status}";
                 }
 
+                if (string.IsNullOrWhiteSpace(errorMessage))
+                {
+                    if (airValue <= 223)
+                    {
+                        _hardware.HeaterRelay.State = true;
+                        status = "Heating";
+                        _hardware.OnboardLed.SetColor(Color.Red);
+                    }
+                    else if (airValue >= 227)
+                    {
+                        _hardware.HeaterRelay.State = false;
+                        status = "Over";
+                        _hardware.OnboardLed.SetColor(Color.Blue);
+                    }
+                    else
+                    {
+                        _hardware.HeaterRelay.State = false;
+                        status = "On Temp";
+                        _hardware.OnboardLed.SetColor(Color.Green);
+                    }
 
-                if (airValue <= 223)
-                {
-                    _hardware.HeaterRelay.State = true;
-                    status = "Heating";
-                    _hardware.OnboardLed.SetColor(Color.Red);
+                    // Add reading to batch collection
+                    var reading = new TemperatureReading(
+                        DateTime.UtcNow,
+                        airValue,
+                        meat1Value,
+                        meat2Value,
+                        status
+                    );
+                    _readingsBatch.Add(reading);
                 }
-                else if (airValue >= 227)
+
+                var timeSinceLastSend = DateTime.UtcNow - lastIoTHubSend;
+                var shouldSendBatch = _readingsBatch.Count > 0 &&
+                    (timeSinceLastSend.TotalMilliseconds >= _iotHubSendIntervalMs || _readingsBatch.Count >= MAX_BATCH_SIZE);
+
+                if (shouldSendBatch)
                 {
-                    _hardware.HeaterRelay.State = false;
-                    status = "Over";
-                    _hardware.OnboardLed.SetColor(Color.Blue);
+                    try
+                    {
+                        // Send batch telemetry
+                        await _iotHubController.SendBatchEnvironmentalReadings(_readingsBatch);
+                        Resolver.Log.Info($"IoT Hub batch sent with {_readingsBatch.Count} readings. Next batch in {_iotHubSendIntervalMs / 1000} seconds.");
+
+                        // Update reported properties with latest readings
+                        var reportedProperties = new DeviceTwinProperties.Reported
+                        {
+                            AirTemperature = lastAirValue,
+                            Meat1Temperature = lastMeat1Value,
+                            Meat2Temperature = lastMeat2Value,
+                            DeviceStatus = lastStatus,
+                            TelemetryIntervalSeconds = _iotHubSendIntervalMs / 1000,
+                            LastUpdate = DateTime.UtcNow
+                        };
+
+                        await _iotHubController.UpdateReportedPropertiesAsync(reportedProperties);
+                        Resolver.Log.Info("Device Twin reported properties updated");
+
+                        _readingsBatch.Clear();
+                        lastIoTHubSend = DateTime.UtcNow;
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        Resolver.Log.Info($"IoT Hub send failed: {ex.Message}");
+                        errorMessage = string.IsNullOrWhiteSpace(errorMessage)
+                            ? $"IoT Hub: {ex.Message}"
+                            : $"{errorMessage} IoT Hub: {ex.Message}";
+                    }
+                    catch (MQTTnet.Exceptions.MqttCommunicationException ex)
+                    {
+                        Resolver.Log.Info($"IoT Hub send failed: {ex.Message}");
+                        errorMessage = string.IsNullOrWhiteSpace(errorMessage)
+                            ? $"IoT Hub: {ex.Message}"
+                            : $"{errorMessage} IoT Hub: {ex.Message}";
+                    }
+                    catch (MQTTnet.Exceptions.MqttProtocolViolationException ex)
+                    {
+                        Resolver.Log.Info($"IoT Hub send failed: {ex.Message}");
+                        errorMessage = string.IsNullOrWhiteSpace(errorMessage)
+                            ? $"IoT Hub: {ex.Message}"
+                            : $"{errorMessage} IoT Hub: {ex.Message}";
+                    }
+                }
+
+                // Track last values for reported properties
+                if (string.IsNullOrWhiteSpace(errorMessage))
+                {
+                    lastStatus = status;
+                    lastAirValue = airValue;
+                    lastMeat1Value = meat1Value;
+                    lastMeat2Value = meat2Value;
+                }
+
+                if (string.IsNullOrWhiteSpace(errorMessage))
+                {
+                    DisplayTemperatures(225, airValue, meat1Value, meat2Value, status);
                 }
                 else
                 {
-                    _hardware.HeaterRelay.State = false;
-                    status = "On Temp";
-                    _hardware.OnboardLed.SetColor(Color.Green);
+                    DisplayError(errorMessage);
                 }
 
-                // Always refresh the display
-                DisplayTemperatures(225, airValue, meat1Value, meat2Value, status);
-
-                // Add reading to batch collection
-                var reading = new TemperatureReading(
-                    DateTime.UtcNow,
-                    airValue,
-                    meat1Value,
-                    meat2Value,
-                    status
-                );
-                _readingsBatch.Add(reading);
-
-                // Only send to IoT Hub at the configured interval
-                var timeSinceLastSend = DateTime.UtcNow - lastIoTHubSend;
-                if (timeSinceLastSend.TotalMilliseconds >= _iotHubSendIntervalMs)
-                {
-                    // Send the entire batch
-                    if (_readingsBatch.Count > 0)
-                    {
-                        _iotHubController.SendBatchEnvironmentalReadings(_readingsBatch);
-                        
-                        Resolver.Log.Info($"IoT Hub batch sent with {_readingsBatch.Count} readings. Next batch in {_iotHubSendIntervalMs / 1000} seconds.");
-                        
-                        // Clear the batch after sending
-                        _readingsBatch.Clear();
-                    }
-                    
-                    // Update reported properties with current device state
-                    var reportedProperties = new DeviceTwinProperties.Reported
-                    {
-                        AirTemperature = Math.Round(airValue, 2),
-                        Meat1Temperature = Math.Round(meat1Value, 2),
-                        Meat2Temperature = Math.Round(meat2Value, 2),
-                        DeviceStatus = status,
-                        TelemetryIntervalSeconds = _iotHubSendIntervalMs / 1000,
-                        LastUpdate = DateTime.UtcNow
-                    };
-                    
-                    _ = _iotHubController.UpdateReportedPropertiesAsync(reportedProperties);
-                    
-                    lastIoTHubSend = DateTime.UtcNow;
-                }
-
-                Thread.Sleep(DISPLAY_REFRESH_INTERVAL_MS);
+                await Task.Delay(DISPLAY_REFRESH_INTERVAL_MS);
             }
         }
 
@@ -271,6 +289,70 @@ namespace CloudOStat.LocalHardware
             _hardware.Display.WriteLine(statusLabel, 3);
 
             Console.WriteLine($"{DateTime.Now.ToString("hh:mm:ss")} {airLabel} {meat1Label} {meat2Label} {statusLabel}");
+        }
+
+        private void DisplayError(string errorMessage)
+        {
+            _hardware.Display.ClearLines();
+            _hardware.Display.WriteLine("Error", 0);
+
+            var message = string.IsNullOrWhiteSpace(errorMessage) ? "Unknown error" : errorMessage;
+            var maxLineLength = 20;
+            var maxLines = 3;
+            var lineIndex = 1;
+
+            for (var i = 0; i < message.Length && lineIndex <= maxLines; i += maxLineLength, lineIndex++)
+            {
+                var length = Math.Min(maxLineLength, message.Length - i);
+                var line = message.Substring(i, length);
+                _hardware.Display.WriteLine(line, (byte)lineIndex);
+            }
+        }
+
+        /// <summary>
+        /// Handle Device Twin desired properties updates from Azure IoT Hub
+        /// </summary>
+        private void OnDesiredPropertiesReceived(object? sender, DeviceTwinDesiredPropertiesEventArgs e)
+        {
+            try
+            {
+                Resolver.Log.Info($"Desired properties received (version={e.Version})");
+
+                // Handle telemetry interval updates
+                if (e.DesiredProperties.TelemetryIntervalSeconds.HasValue)
+                {
+                    var desiredInterval = e.DesiredProperties.TelemetryIntervalSeconds.Value;
+
+                    // Validate interval is within acceptable range
+                    if (desiredInterval < MIN_TELEMETRY_INTERVAL_SECONDS || desiredInterval > MAX_TELEMETRY_INTERVAL_SECONDS)
+                    {
+                        Resolver.Log.Info($"Telemetry interval {desiredInterval}s is out of range ({MIN_TELEMETRY_INTERVAL_SECONDS}-{MAX_TELEMETRY_INTERVAL_SECONDS}s). Ignoring.");
+                        
+                        _hardware.Display.ClearLines();
+                        _hardware.Display.WriteLine("Invalid interval", 0);
+                        _hardware.Display.WriteLine($"Must be {MIN_TELEMETRY_INTERVAL_SECONDS}-{MAX_TELEMETRY_INTERVAL_SECONDS}s", 1);
+                        
+                        return;
+                    }
+
+                    var previousInterval = _iotHubSendIntervalMs / 1000;
+                    _iotHubSendIntervalMs = desiredInterval * 1000;
+
+                    Resolver.Log.Info($"Telemetry interval updated: {previousInterval}s → {desiredInterval}s");
+
+                    // Show update on display
+                    _hardware.Display.ClearLines();
+                    _hardware.Display.WriteLine("Interval updated", 0);
+                    _hardware.Display.WriteLine($"Was: {previousInterval}s", 1);
+                    _hardware.Display.WriteLine($"Now: {desiredInterval}s", 2);
+
+                    // Display will be replaced by temperature readings in the next loop iteration
+                }
+            }
+            catch (Exception ex)
+            {
+                Resolver.Log.Info($"Error processing desired properties: {ex.Message}");
+            }
         }
 
         private Settings ReadSettings()
