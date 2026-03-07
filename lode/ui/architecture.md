@@ -2,8 +2,19 @@
 
 ## Component hierarchy, responsive design, theming, error handling, and platform abstraction
 
+Related:
+- [../practices.md](../practices.md)
+- [../summary.md](../summary.md)
+
 ### Overview
 CloudOStat uses a shared Razor component library (`CloudOStat.App.Shared`) consumed by both MAUI (`CloudOStat.App`) and Blazor WebAssembly/Server (`CloudOStat.App.Web` + `.Web.Client`). This enables write-once UI with platform-specific hosting.
+
+```mermaid
+flowchart TD
+    Theme[CloudOStatTheme.cs] -->|MudThemeProvider| Layout[MainLayout.razor]
+    Css[app.css] --> Layout
+    Layout --> Components[Shared components/pages]
+```
 
 ---
 
@@ -15,6 +26,7 @@ CloudOStat uses a shared Razor component library (`CloudOStat.App.Shared`) consu
   - Toggles between desktop (persistent drawer) and mobile (temporary drawer + bottom nav)
   - Wraps entire layout in `ErrorBoundary` for Blazor rendering error recovery
 - **NavMenu.razor**: Navigation list for drawer
+  - Drawer links use `IconColor="Color.Inherit"` so icons match the drawer text color defined by the active MudBlazor theme
 - **BottomNav.razor**: Mobile-only bottom navigation bar (hidden on desktop/tablet)
 
 ### Pages
@@ -70,12 +82,12 @@ private void UpdateLayout(Breakpoint breakpoint)
 
 **MainLayout.razor:**
 ```razor
-<MudAppBar Color="Color.Primary" Elevation="1">
+<MudAppBar Color="Color.Default" Elevation="1">
     @if (!_isMobile)
     {
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" ... />
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Primary" ... />
     }
-    <MudText Typo="Typo.h6">CloudOStat</MudText>
+    <MudText Color="Color.Primary" Typo="Typo.h6">CloudOStat</MudText>
 </MudAppBar>
 
 @if (!_isMobile)
@@ -182,11 +194,130 @@ MAUI projects require explicit MudBlazor static asset references in `wwwroot/ind
 ## Theming
 
 ### MudBlazor Theme System
-- **CloudOStatTheme.cs**: Defines custom theme (SmokerEmber) with typography, palette, shadows
-- **MudThemeProvider**: Applied in MainLayout.razor
+- **CloudOStatTheme.cs**: Defines custom themes with typography, palette, shadows
+- **MudThemeProvider**: Applied in MainLayout.razor (current default: `CloudOStatTheme.SmokerEmber`)
 - **CSS files**:
-  - `app.css` (global): Site-wide styles, mobile safe-area adjustments
+  - `app.css` (global): Site-wide styles, mobile safe-area adjustments, **CRT glow effects**
   - `MainLayout.razor.css`, `BottomNav.razor.css` (scoped): Component-specific styles
+
+### Available Themes
+
+#### SmokerEmber
+Warm, amber/orange palette inspired by classic smoker barbecue:
+- **Primary**: Smoked Ember (#B33F1C)
+- **Secondary**: Charred Oak (#5A2E1A)
+- **Accent**: Glazed Honey (#F2A65A)
+- **Background**: Ash White (#F7F3EE)
+- **Status**: Heating (Active Flame), Cooling (Cooling Ash), OnTemp (Herb Green)
+
+#### BackyardPitmaster
+Cool steel tones with seasoned wood accents:
+- **Primary**: Smoker Steel (#2F3E46)
+- **Secondary**: Cold Smoke (#354F52)
+- **Accent**: Seasoned Wood (#DDA15E)
+- **Background**: Canvas Tan (#EAE7DC)
+- **Status**: Heating (Glowing Coals), Cooling (Cool Steel Blue), OnTemp (Olive Green)
+
+#### TemperatureGradient
+Dynamic gradient from cool to warm zones:
+- **Primary**: Warm Zone (#F4A261)
+- **Secondary**: Cool Zone (#1B4965)
+- **Accent**: Hot Zone (#E76F51)
+- **Background**: Neutral (#F1FAEE)
+- **Status**: Heating (Rising Heat), Cooling (Falling Cool), OnTemp (Balanced Teal)
+
+#### FarmhouseModern
+Earthy, sage and clay palette:
+- **Primary**: Sage Smoke (#6B705C)
+- **Secondary**: Clay (#CB997E)
+- **Accent**: Butcher Paper (#DDBEA9)
+- **Background**: Warm Neutral (#FFE8D6)
+- **Status**: Heating (Warm Terracotta), Cooling (Cool Sage Gray), OnTemp (Soft Balanced Green)
+
+#### CRT80sNeon ✨
+Classic 1980s movie computer interface (WarGames/Tron style):
+- **Primary**: Phosphor Green (#00FF00) – Classic CRT terminal glow
+- **Secondary**: Neon Cyan (#00FFFF) – WarGames/Tron aesthetic
+- **Accent**: Hot Magenta (#FF00FF) – Neon glow effect
+- **Background**: Deep Space Black (#0A0E27) – CRT scan black with blue tint
+- **Surfaces**: Dark Navy (#0F1535) – Subtle depth
+- **Typography**: Monospace (Courier New/Monaco) – Authentic terminal feel
+- **Status**:
+  - Heating: Hot Magenta-Red (#FF0055) – Intense, danger glow
+  - Cooling: Bright Cyan (#00FFFF) – Icy, system calm
+  - OnTemp: Bright Green (#00FF00) – Stable, nominal
+  - Warning: Bright Yellow (#FFFF00) – Maximum visibility
+  - Error: Neon Red (#FF1111) – Critical danger
+- **Design**: Minimal border radius (2px), high contrast, bright neon on dark background, authentic CRT aesthetic with monospace typography throughout
+
+#### BeamPenetrationVector
+Vector display theme with a deep-black background and phosphor-blue text accents:
+- **Primary**: Beam Blue (#4DA3FF)
+- **Secondary**: Beam Yellow (#FFD24D)
+- **Accent**: Beam Orange (#FF9A3D)
+- **Background**: Deep Black (#050505)
+
+**app.css (vector styling):**
+```css
+.vector-beam-display .mud-appbar {
+    background-color: var(--vector-beam-background);
+}
+
+.vector-glow-text {
+    color: var(--vector-beam-blue);
+    text-shadow:
+        0 0 3px var(--vector-beam-blue),
+        0 0 8px rgba(77, 163, 255, 0.7),
+        0 0 14px rgba(77, 163, 255, 0.5),
+        0 0 22px rgba(77, 163, 255, 0.35);
+}
+```
+
+### CRT Phosphor Glow Effects
+When using the **CRT80sNeon** theme, text can opt into glowing phosphor effects via CSS text-shadows in `app.css`:
+
+**Available CSS Classes:**
+- `.crt-glow-text` – Green glow (default, used on main content)
+- `.crt-glow-text-cyan` – Cyan glow (for secondary text/accents)
+- `.crt-glow-text-magenta` – Magenta glow (for warnings/highlights)
+- `.crt-glow-pulse` – Animated pulsing glow (add to any element for breathing effect)
+
+**Technical Details:**
+- Uses multi-layer `text-shadow` to create authentic phosphor green glow
+- Base glow layers: 3px, 8px, 15px, 25px for depth and luminosity
+- CSS variables (`--crt-glow-green`, `--crt-glow-cyan`, `--crt-glow-magenta`) enable easy customization
+- Applied selectively via class usage
+
+**Example Usage:**
+```html
+<!-- Green glow (default) -->
+<MudText Class="crt-glow-text">Normal text with glow</MudText>
+
+<!-- Cyan glow for accent text -->
+<MudText Class="crt-glow-text-cyan">Important system message</MudText>
+```
+
+### Beam-Penetration Vector Effects
+The **BeamPenetrationVector** theme applies vector-specific effects via `app.css`:
+
+**Effects:**
+- **Phosphor bloom** via layered white text-shadows
+- **Beam-dwell artifacts** via subtle horizontal offset shadows
+- **No scanlines** (vector displays are beam-driven, not raster)
+- **Outline-only surfaces** (transparent fills + yellow outlines)
+
+**Available CSS Classes:**
+- `.vector-beam-display` – Root class applied on `MudLayout`
+- `.vector-glow-text` – Extra bloom for titles and focal labels
+- `.vector-beam-blue`, `.vector-beam-yellow`, `.vector-beam-orange`, `.vector-beam-red` – Beam-penetration color accents
+- `.vector-outline-surface` – Optional outline-only container helper
+
+**Example Usage:**
+```html
+<MudText Class="vector-glow-text">Vector headline</MudText>
+<MudText Class="vector-beam-yellow">Locked at 225°F</MudText>
+<MudPaper Class="vector-outline-surface">Outlined panel</MudPaper>
+```
 
 ### Styling Guidelines
 **Prefer MudBlazor's theming system over custom CSS:**
@@ -195,101 +326,6 @@ MAUI projects require explicit MudBlazor static asset references in `wwwroot/ind
 - Only create custom CSS when:
   - MudBlazor explicitly recommends it (e.g., scoped styles for layout-specific adjustments)
   - Platform-specific requirements (e.g., mobile safe-area handling)
-  - Global styles not covered by MudBlazor's theme system
+  - Global styles not covered by MudBlazor's theme system (e.g., CRT glow effects)
 
 **Rationale:** MudBlazor's theme engine ensures consistent styling, automatic dark mode support, and easier maintenance. Custom CSS can conflict with theme updates and requires manual dark mode handling.
-
-### Overriding MudBlazor Component Styles
-**Important: Use global CSS for MudBlazor overrides, not scoped CSS**
-
-**Problem:** MudBlazor components (like `MudNavLink`) use hardcoded defaults that don't respect theme palette properties. For example, `MudNavLink` icons default to `#616161` (Material Design gray) regardless of `DrawerText` color in the theme.
-
-**Solution:** Override in global CSS (`app.css`), not component-scoped `.razor.css` files.
-
-**Why scoped CSS fails:**
-- Blazor's CSS isolation with `::deep` is unreliable with MudBlazor components
-- MudBlazor's internal DOM structure and CSS specificity can prevent scoped styles from applying
-- Global CSS is the officially recommended approach for MudBlazor style overrides
-
-**Example - NavMenu icon colors:**
-```css
-/* In app.css (global) */
-.mud-nav-link .mud-nav-link-icon-default,
-.mud-nav-link .mud-icon-root {
-    color: #F7F3EE !important;  /* theme DrawerText color */
-}
-
-.mud-nav-link.active .mud-icon-root {
-    color: #B33F1C !important;  /* theme Primary color */
-}
-```
-
-**When to use `!important`:**
-- Required when overriding MudBlazor's inline or high-specificity styles
-- Use sparingly; only when necessary to override component defaults
-
-### Color Scheme (SmokerEmber)
-- Primary: Ember orange (#B33F1C)
-- Secondary: Charcoal gray (#5A2E1A)
-- Accent: Glazed Honey (#F2A65A)
-- Background: Ash White (#F7F3EE)
-
----
-
-## Platform Abstraction
-
-### IFormFactor Service
-- **Interface**: `IFormFactor` in `CloudOStat.App.Shared/Services`
-- **Implementations**:
-  - MAUI: `FormFactor` in `CloudOStat.App/Services`
-  - Web: TBD (server/client-specific implementations)
-
-**Purpose**: Detect device capabilities, screen size, input methods
-**Usage**: Injected into components needing platform-specific behavior
-
-### Registration
-Each host registers its own implementation:
-- `MauiProgram.cs`: `builder.Services.AddSingleton<IFormFactor, FormFactor>()`
-- `Program.cs` (Web): Similar registration for web-specific version
-
----
-
-## Navigation
-
-### NavigationService
-- Centralized route definitions in `Services/NavigationService.cs`
-- Maps display names to route paths
-- Used by NavMenu and BottomNav for consistent navigation
-- Example: `Dashboard → /`, `Settings → /settings`, `About → /about`
-
----
-
-## Best Practices
-
-### Adding New Pages
-1. Create `.razor` file in `CloudOStat.App.Shared/Pages`
-2. Add route definition to `NavigationService`
-3. Add navigation entry to `NavMenu.razor` and/or `BottomNav.razor` (if mobile-relevant)
-4. Wrap sensitive operations in try/catch or use ErrorBoundary child boundaries for isolation
-
-### Handling Async Operations
-- Always pass `CancellationToken` to async methods
-- Wrap async initialization in `OnInitializedAsync` with error handling
-- Use `InvokeAsync(() => StateHasChanged())` when updating from background threads
-
-### MAUI Static Assets Checklist
-When adding UI libraries to MAUI projects:
-1. Verify CSS references in `wwwroot/index.html`
-2. Verify JavaScript references in `wwwroot/index.html`
-3. Test in MAUI app first (web projects usually include assets automatically)
-4. Check browser console for 404 errors on static assets
-
----
-
-## Related Files
-- MainLayout: `CloudOStat.App.Shared/Layout/MainLayout.razor`, `.razor.cs`, `.razor.css`
-- Error handling: `CloudOStat.App/App.xaml.cs`, `CloudOStat.App/MauiProgram.cs`
-- Theme: `CloudOStat.App.Shared/Theme/CloudOStatTheme.cs`
-- Navigation: `CloudOStat.App.Shared/Services/NavigationService.cs`
-- MAUI host page: `CloudOStat.App/wwwroot/index.html`
-- Web host page: `CloudOStat.App.Web/Components/App.razor`

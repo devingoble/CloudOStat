@@ -21,11 +21,19 @@ All UI and shared logic lives in **`CloudOStat.App.Shared`** (`net10.0` class li
 ## Dependency Injection Pattern
 Each host registers shared services independently:
 
+```mermaid
+flowchart LR
+    Shared[CloudOStat.App.Shared] --> Maui[MAUI Host]
+    Shared --> Web[Blazor Web Server]
+    Shared --> Wasm[Blazor WASM Client]
+```
+
 **MAUI (MauiProgram.cs)**:
 ```csharp
 builder.Services.AddMudServices();
 builder.Services.AddSingleton<NavigationService>();
 builder.Services.AddSingleton<IFormFactor, FormFactor>();
+builder.Services.AddSingleton<IDeviceControlService, DeviceControlService>();
 builder.Services.AddMauiBlazorWebView();
 ```
 
@@ -34,10 +42,24 @@ builder.Services.AddMauiBlazorWebView();
 builder.Services.AddMudServices();
 builder.Services.AddSingleton<NavigationService>();
 builder.Services.AddSingleton<IFormFactor, FormFactor>();
+builder.Services.AddScoped(sp =>
+{
+    var navigationManager = sp.GetRequiredService<NavigationManager>();
+    return new HttpClient { BaseAddress = new Uri(navigationManager.BaseUri) };
+});
+builder.Services.AddScoped<IDeviceControlService>(sp =>
+    new DeviceControlService(sp.GetRequiredService<HttpClient>()));
 ```
 
 **Blazor WASM Client (Program.cs)**:
-- Mirrors server registration where applicable.
+```csharp
+builder.Services.AddMudServices();
+builder.Services.AddSingleton<NavigationService>();
+builder.Services.AddSingleton<IFormFactor, FormFactor>();
+builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
+builder.Services.AddScoped<IDeviceControlService>(sp =>
+    new DeviceControlService(sp.GetRequiredService<HttpClient>()));
+```
 
 ## Package Management
 **Central versioning via `Directory.Packages.props`** (centralized package version management):

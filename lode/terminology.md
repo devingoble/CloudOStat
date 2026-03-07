@@ -21,6 +21,15 @@
 - **MudBlazor**: Blazor component library providing Material Design UI and theming.
 - **NavigationService**: Centralized route management across all platform hosts.
 
+## IoT Hub & Cloud
+- **Azure IoT Hub**: Cloud service that manages device-to-cloud and cloud-to-device communication.
+- **Device Twin**: JSON document in IoT Hub representing device state. Has **reported properties** (set by device) and **desired properties** (set by cloud/app).
+- **SAS Token**: Shared Access Signature token used to authenticate REST API calls to IoT Hub. Generated from a policy key via HMAC-SHA256.
+- **SharedAccessKeyName / skn**: The name of the IoT Hub shared access policy (e.g., `iothubowner`, `service`). Must match the policy that owns the `SharedAccessKey`.
+- **Telemetry Interval**: Configurable reporting frequency (5–300 seconds) set via device twin desired properties.
+- **Reported Properties**: Twin properties written by the Meadow device (temperatures, status, last update).
+- **Desired Properties**: Twin properties written by the app to configure device behavior.
+
 ## Architecture / Project Structure
 - **AppHost**: Orchestrator project (uses .NET Aspire for local multi-project orchestration).
 - **ServiceDefaults**: Common service registration and middleware (HTTP resilience, telemetry).

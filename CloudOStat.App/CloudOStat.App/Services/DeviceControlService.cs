@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using CloudOStat.App.Shared.Services;
+using Microsoft.Extensions.Configuration;
 
 namespace CloudOStat.App.Services;
 
@@ -15,18 +16,22 @@ public class DeviceControlService : IDeviceControlService
     private readonly string _iotHubName;
     private readonly string _deviceId;
     private readonly string _sharedAccessKey;
+    private readonly string _sharedAccessKeyName;
     private readonly string _iotHubUri;
     
     private const int MinTelemetryInterval = 5;
     private const int MaxTelemetryInterval = 300;
     private const int SasTokenExpiryMinutes = 60;
 
-    public DeviceControlService()
+    public DeviceControlService(IConfiguration configuration)
     {
-        // Load configuration from app settings or environment
-        _iotHubName = AppSettings.IotHubName ?? "usw-iot-cloudostat";
-        _deviceId = AppSettings.DeviceId ?? "cloudostat-meadow";
-        _sharedAccessKey = AppSettings.SharedAccessKey ?? string.Empty;
+        ArgumentNullException.ThrowIfNull(configuration);
+        
+        // Load configuration from appsettings.json or environment variables
+        _iotHubName = configuration["IoTHub:HubName"] ?? "usw-iot-cloudostat";
+        _deviceId = configuration["IoTHub:DeviceId"] ?? "cloudostat-meadow";
+        _sharedAccessKey = configuration["IoTHub:SharedAccessKey"] ?? string.Empty;
+        _sharedAccessKeyName = configuration["IoTHub:SharedAccessKeyName"] ?? "iothubowner";
         _iotHubUri = $"{_iotHubName}.azure-devices.net";
         
         _httpClient = new HttpClient();
@@ -149,9 +154,8 @@ public class DeviceControlService : IDeviceControlService
 
     private string GenerateSasToken()
     {
-        var resourceUri = $"{_iotHubUri}/devices/{_deviceId}";
-        var encodedResourceUri = Uri.EscapeDataString(resourceUri);
-        
+        var encodedResourceUri = Uri.EscapeDataString(_iotHubUri);
+
         var expiryTime = DateTimeOffset.UtcNow.AddMinutes(SasTokenExpiryMinutes).ToUnixTimeSeconds();
         var signatureString = $"{encodedResourceUri}\n{expiryTime}";
 
@@ -160,7 +164,7 @@ public class DeviceControlService : IDeviceControlService
         var signatureBytes = hmac.ComputeHash(Encoding.UTF8.GetBytes(signatureString));
         var signature = Convert.ToBase64String(signatureBytes);
 
-        return $"SharedAccessSignature sr={encodedResourceUri}&sig={Uri.EscapeDataString(signature)}&se={expiryTime}&skn=device";
+        return $"sr={encodedResourceUri}&sig={Uri.EscapeDataString(signature)}&se={expiryTime}&skn={_sharedAccessKeyName}";
     }
 
     private static double? TryGetDouble(JsonElement element, string propertyName)
@@ -205,15 +209,4 @@ public class DeviceControlService : IDeviceControlService
         }
         return null;
     }
-}
-
-/// <summary>
-/// Application settings for device control
-/// Can be loaded from config files, environment variables, or app preferences
-/// </summary>
-public static class AppSettings
-{
-    public static string? IotHubName { get; set; }
-    public static string? DeviceId { get; set; }
-    public static string? SharedAccessKey { get; set; }
 }

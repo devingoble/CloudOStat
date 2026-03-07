@@ -1,7 +1,9 @@
 using CloudOStat.App.Web.Components;
 using CloudOStat.App.Shared.Services;
 using CloudOStat.App.Web.Services;
+using Microsoft.AspNetCore.Components;
 using MudBlazor.Services;
+using WebClientDeviceControlService = CloudOStat.App.Web.Client.Services.DeviceControlService;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +19,15 @@ builder.Services.AddSingleton<NavigationService>();
 
 // Add device-specific services used by the CloudOStat.App.Shared project
 builder.Services.AddSingleton<IFormFactor, FormFactor>();
+
+builder.Services.AddScoped(sp =>
+{
+    var navigationManager = sp.GetRequiredService<NavigationManager>();
+    return new HttpClient { BaseAddress = new Uri(navigationManager.BaseUri) };
+});
+
+builder.Services.AddScoped<IDeviceControlService>(sp =>
+    new WebClientDeviceControlService(sp.GetRequiredService<HttpClient>()));
 
 // Add controllers for API endpoints
 builder.Services.AddControllers();

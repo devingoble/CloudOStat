@@ -64,6 +64,11 @@
 
     <!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
     <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+
+    <!-- Configuration files -->
+    <MauiAsset Include="appsettings.json" LogicalName="appsettings.json" />
+    <MauiAsset Include="appsettings.Debug.json" LogicalName="appsettings.Debug.json" Condition="'$(Configuration)' == 'Debug'" />
+    <MauiAsset Include="appsettings.Release.json" LogicalName="appsettings.Release.json" Condition="'$(Configuration)' == 'Release'" />
   </ItemGroup>
 
   <ItemGroup>

@@ -69,4 +69,36 @@ public static class SmokerAppColorSchemes
         public const string Warning = "#B56576";      // Stall Pink (caution, temperature stall)
         public const string Error = "#9D0208";        // Deep Red (danger, critical issue)
     }
+
+    public class CRT80sNeon
+    {
+        // Main palette - Dark CRT background with neon phosphor highlights
+        public const string Primary = "#0A0E27";      // Phosphor Green (classic CRT terminal)
+        public const string Secondary = "#00FFFF";    // Neon Cyan (WarGames/Tron aesthetic)
+        public const string Accent = "#FF00FF";       // Hot Magenta (neon glow)
+        public const string Background = "#0A0E27";   // Deep space black with blue tint (CRT scan black)
+
+        // Status colors - Bright, high-contrast neon
+        public const string Heating = "#FF0055";      // Hot Magenta-Red (intense heating, danger glow)
+        public const string Cooling = "#00FFFF";      // Bright Cyan (cool, icy, system calm)
+        public const string OnTemp = "#00FF00";       // Bright Phosphor Green (stable, nominal)
+        public const string Warning = "#FFFF00";      // Bright Yellow (caution, maximum visibility)
+        public const string Error = "#FF1111";        // Neon Red (critical, blinking danger)
+    }
+
+    public class BeamPenetrationVector
+    {
+        // Main palette - Beam-penetration vector display (4-color limit)
+        public const string Primary = "#4DA3FF";      // Beam Blue
+        public const string Secondary = "#FFD24D";    // Beam Yellow
+        public const string Accent = "#FF9A3D";       // Beam Orange
+        public const string Background = "#050505";   // Deep black vector background
+
+        // Status colors - Limited to beam-penetration palette
+        public const string Heating = "#FF9A3D";      // Beam Orange (heating)
+        public const string Cooling = "#4DA3FF";      // Beam Blue (cooling)
+        public const string OnTemp = "#FFD24D";       // Beam Yellow (stable)
+        public const string Warning = "#FF9A3D";      // Beam Orange (warning)
+        public const string Error = "#FF4B4B";        // Beam Red (critical)
+    }
 }

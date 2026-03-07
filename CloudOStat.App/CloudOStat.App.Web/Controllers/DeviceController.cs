@@ -176,9 +176,8 @@ public class DeviceController : ControllerBase
 
     private string GenerateSasToken(string iotHubUri, string deviceId, string sharedAccessKey)
     {
-        var resourceUri = $"{iotHubUri}/devices/{deviceId}";
-        var encodedResourceUri = Uri.EscapeDataString(resourceUri);
-        
+        var encodedResourceUri = Uri.EscapeDataString(iotHubUri);
+
         var expiryTime = DateTimeOffset.UtcNow.AddMinutes(SasTokenExpiryMinutes).ToUnixTimeSeconds();
         var signatureString = $"{encodedResourceUri}\n{expiryTime}";
 
@@ -187,7 +186,8 @@ public class DeviceController : ControllerBase
         var signatureBytes = hmac.ComputeHash(Encoding.UTF8.GetBytes(signatureString));
         var signature = Convert.ToBase64String(signatureBytes);
 
-        return $"SharedAccessSignature sr={encodedResourceUri}&sig={Uri.EscapeDataString(signature)}&se={expiryTime}&skn=device";
+        var keyName = _configuration["IoTHub:SharedAccessKeyName"] ?? "iothubowner";
+        return $"sr={encodedResourceUri}&sig={Uri.EscapeDataString(signature)}&se={expiryTime}&skn={keyName}";
     }
 
     private static double? TryGetDouble(JsonElement element, string propertyName)

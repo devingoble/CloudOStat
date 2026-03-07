@@ -12,6 +12,13 @@
   - MudBlazor theme integration
   - Platform abstraction via IFormFactor
 
+## Architecture & IoT
+- [architecture/iot-hub-auth.md](architecture/iot-hub-auth.md) – SAS token auth, IoT Hub REST API, IDeviceControlService implementations
+  - SAS token generation (resource URI, skn, expiry)
+  - Configuration keys (HubName, DeviceId, SharedAccessKey, SharedAccessKeyName)
+  - Three-host service topology (MAUI direct, Web controller, WASM proxy)
+  - Telemetry interval constraints
+
 ## Hardware & Control
 - [hardware/sensors-and-control.md](hardware/sensors-and-control.md) – Meadow F7, MAX31855 thermocouples, relay, LCD, RGB LED
   - IHardwarePackage abstraction

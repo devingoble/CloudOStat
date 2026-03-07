@@ -3,7 +3,7 @@
 <MudNavMenu>
     @foreach (var item in Nav.PrimaryNav)
     {
-        <MudNavLink Href="@item.Route" Match="@(item.MatchAll ? NavLinkMatch.All : NavLinkMatch.Prefix)" Icon="@item.Icon">
+        <MudNavLink Href="@item.Route" Match="@(item.MatchAll ? NavLinkMatch.All : NavLinkMatch.Prefix)" Icon="@item.Icon" IconColor="Color.Inherit">
             @item.Label
         </MudNavLink>
     }
