@@ -46,17 +46,46 @@ The built-in `service` policy only has Service Connect and will return **401 Una
 flowchart TD
     IDeviceControlService["IDeviceControlService\n(CloudOStat.App.Shared)"]
     MauiSvc["DeviceControlService\n(CloudOStat.App)\nDirect IoT Hub REST calls"]
-    WebCtrl["DeviceController\n(CloudOStat.App.Web)\nASP.NET API controller\nDirect IoT Hub REST calls"]
-    WasmSvc["DeviceControlService\n(CloudOStat.App.Web.Client)\nHTTP proxy to WebCtrl"]
+    WebSvc["IoTHubDeviceService\n(CloudOStat.App.Web/Services)\nDirect IoT Hub REST calls\nvia IHttpClientFactory"]
+    WasmSvc["DeviceControlService\n(CloudOStat.App.Web.Client)\nHTTP proxy to minimal APIs"]
+
+    subgraph DeviceModule["Modules/Device (vertical slice)"]
+        GetStatus["GetStatus\n(Endpoints/GetStatus.cs)"]
+        UpdateDesired["UpdateDesiredProperties\n(Endpoints/UpdateDesiredProperties.cs)"]
+        Module["DeviceModule.cs\n(route mapping)"]
+        Services["DeviceServices.cs\n(DI registration)"]
+    end
 
     IDeviceControlService --> MauiSvc
     IDeviceControlService --> WasmSvc
-    WasmSvc -->|"GET/POST /api/device/*"| WebCtrl
+    WebSvc -.->|implements| IDeviceControlService
+    GetStatus -->|injects| WebSvc
+    UpdateDesired -->|injects| WebSvc
+    Module -->|delegates to| GetStatus
+    Module -->|delegates to| UpdateDesired
+    WasmSvc -->|"GET/POST /api/device/*"| Module
+```
+
+### Vertical Slice Structure
+```
+CloudOStat.App.Web/
+├── Modules/
+│   └── Device/
+│       ├── Endpoints/
+│       │   ├── GetStatus.cs          ← one class per operation
+│       │   └── UpdateDesiredProperties.cs
+│       ├── DeviceModule.cs           ← route mapping (MapDeviceEndpoints)
+│       └── DeviceServices.cs         ← DI registration (RegisterDeviceServices)
+└── Services/
+    └── IoTHubDeviceService.cs        ← IoT Hub REST API communication
 ```
 
 - **MAUI** (`CloudOStat.App/Services/DeviceControlService.cs`): Calls IoT Hub REST API directly using `HttpClient` + SAS token.
-- **Web Server** (`CloudOStat.App.Web/Controllers/DeviceController.cs`): ASP.NET controller that calls IoT Hub REST API directly. Serves as the backend for WebAssembly clients.
-- **WebAssembly** (`CloudOStat.App.Web.Client/Services/DeviceControlService.cs`): HTTP proxy — calls `/api/device/status` and `/api/device/twin/desired` on the web server. Cannot call IoT Hub directly from the browser.
+- **Web Server** (`CloudOStat.App.Web/Services/IoTHubDeviceService.cs`): Implements `IDeviceControlService`. Calls IoT Hub REST API via `IHttpClientFactory`. Registered as singleton.
+- **Web Endpoints** (`CloudOStat.App.Web/Modules/Device/Endpoints/`): One handler class per operation — `GetStatus` and `UpdateDesiredProperties`. Each is a plain class with constructor injection of `IoTHubDeviceService`. Nested records for commands/DTOs.
+- **Device Module** (`CloudOStat.App.Web/Modules/Device/DeviceModule.cs`): `MapDeviceEndpoints` extension maps routes under `/api/device` and delegates to handler classes.
+- **Device Services** (`CloudOStat.App.Web/Modules/Device/DeviceServices.cs`): `RegisterDeviceServices` extension registers `IoTHubDeviceService`, `IHttpClientFactory`, and endpoint handlers.
+- **WebAssembly** (`CloudOStat.App.Web.Client/Services/DeviceControlService.cs`): HTTP proxy — calls `/api/device/status` and `/api/device/twin/desired` on the web server.
 
 ## REST API Endpoints Used
 

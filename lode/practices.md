@@ -18,6 +18,27 @@ All UI and shared logic lives in **`CloudOStat.App.Shared`** (`net10.0` class li
 - Theme: `Themes.cs` (four color schemes), `CloudOStatTheme.cs` (MudBlazor theme definition)
 - Styles: `MainLayout.razor.css`, `BottomNav.razor.css`, `app.css` (scoped + global CSS)
 
+## Vertical Slice Minimal API Pattern
+API endpoints in `CloudOStat.App.Web` follow a vertical slice pattern inspired by the architecture reference in `lode/tmp/architecture-reference-handover..md`. Each feature is self-contained under `Modules/[Feature]/`:
+
+```
+CloudOStat.App.Web/
+└── Modules/
+    └── [Feature]/
+        ├── Endpoints/
+        │   ├── [Operation1].cs    ← plain class, constructor injection, nested records
+        │   └── [Operation2].cs
+        ├── [Feature]Module.cs     ← MapXxxEndpoints() extension on IEndpointRouteBuilder
+        └── [Feature]Services.cs   ← RegisterXxxServices() extension on IServiceCollection
+```
+
+Key rules:
+- **One class per operation** — no static methods, no base classes
+- **Nested records for commands/DTOs** — co-located with handler, avoids separate Models folder
+- **Module file** maps routes and delegates to injected handler classes
+- **Services file** registers handlers (scoped) and supporting services
+- **Program.cs** calls `RegisterXxxServices()` and `MapXxxEndpoints()` — one line per feature
+
 ## Dependency Injection Pattern
 Each host registers shared services independently:
 
@@ -42,13 +63,20 @@ builder.Services.AddMauiBlazorWebView();
 builder.Services.AddMudServices();
 builder.Services.AddSingleton<NavigationService>();
 builder.Services.AddSingleton<IFormFactor, FormFactor>();
+
+// Module registration — one call per feature
+builder.Services.RegisterDeviceServices();
+
 builder.Services.AddScoped(sp =>
 {
     var navigationManager = sp.GetRequiredService<NavigationManager>();
     return new HttpClient { BaseAddress = new Uri(navigationManager.BaseUri) };
 });
 builder.Services.AddScoped<IDeviceControlService>(sp =>
-    new DeviceControlService(sp.GetRequiredService<HttpClient>()));
+    new DeviceControlService(sp.GetRequiredService<HttpClient>())); // WASM proxy for Blazor Server components
+
+// Endpoint mapping — one call per feature
+app.MapDeviceEndpoints();
 ```
 
 **Blazor WASM Client (Program.cs)**:

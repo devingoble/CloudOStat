@@ -1,5 +1,6 @@
-using CloudOStat.App.Web.Components;
 using CloudOStat.App.Shared.Services;
+using CloudOStat.App.Web.Components;
+using CloudOStat.App.Web.Modules.Device;
 using CloudOStat.App.Web.Services;
 using Microsoft.AspNetCore.Components;
 using MudBlazor.Services;
@@ -26,11 +27,12 @@ builder.Services.AddScoped(sp =>
     return new HttpClient { BaseAddress = new Uri(navigationManager.BaseUri) };
 });
 
+// Module registration — one call per feature
+builder.Services.RegisterDeviceServices();
+
+// WASM client proxy for Blazor Server interactive components
 builder.Services.AddScoped<IDeviceControlService>(sp =>
     new WebClientDeviceControlService(sp.GetRequiredService<HttpClient>()));
-
-// Add controllers for API endpoints
-builder.Services.AddControllers();
 
 var app = builder.Build();
 
@@ -54,8 +56,8 @@ app.UseAntiforgery();
 
 app.MapStaticAssets();
 
-// Map API controllers
-app.MapControllers();
+// Endpoint mapping — one call per feature
+app.MapDeviceEndpoints();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
