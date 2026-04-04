@@ -87,7 +87,30 @@ CloudOStat.App.Web/
 - **Device Services** (`CloudOStat.App.Web/Modules/Device/DeviceServices.cs`): `RegisterDeviceServices` extension registers `IoTHubDeviceService`, `IHttpClientFactory`, and endpoint handlers.
 - **WebAssembly** (`CloudOStat.App.Web.Client/Services/DeviceControlService.cs`): HTTP proxy — calls `/api/device/status` and `/api/device/twin/desired` on the web server.
 
-## REST API Endpoints Used
+## Device Status Model
+
+### `DeviceOperationalStatus` enum (`IDeviceControlService.cs`)
+Typed representation of what the Meadow device reports in the `device_status` twin property:
+
+| Enum value | Maps from raw string | Meaning |
+|---|---|---|
+| `Heating` | `"Heating"` | Heater relay active; temp below setpoint |
+| `OnTemp` | `"On Temp"` | At setpoint; relay off |
+| `Over` | `"Over"` | Above setpoint; relay off |
+| `Offline` | *(stale twin)* | No update within 10 minutes |
+| `Error` | any other string | Sensor/comms error message |
+| `Unknown` | `null` / empty | No data yet |
+
+### `DeviceStatus.StatusKind` property
+Computed via `DeviceStatus.ParseStatusKind(raw, isConnected)`. Always set by the service
+implementations (both Web and MAUI); the WASM client receives it pre-computed via JSON.
+
+### `DeviceStatus.IsConnected`
+Derived from `LastUpdate` staleness — `true` only if the twin reported within the last **10 minutes**
+(`StaleDeviceThreshold = TimeSpan.FromMinutes(10)` in both service implementations).
+Previously hardcoded to `true`.
+
+
 
 | Operation | HTTP Method | IoT Hub URL |
 |---|---|---|

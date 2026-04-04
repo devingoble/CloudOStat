@@ -1,7 +1,26 @@
 namespace CloudOStat.App.Shared.Services;
 
 /// <summary>
-/// Device status information retrieved from device twin reported properties
+/// Typed representation of the device's operational state reported via device twin.
+/// </summary>
+public enum DeviceOperationalStatus
+{
+    /// <summary>Status is absent or could not be parsed.</summary>
+    Unknown,
+    /// <summary>Heater relay is active; temperature is below target.</summary>
+    Heating,
+    /// <summary>Temperature is at the target setpoint; relay is off.</summary>
+    OnTemp,
+    /// <summary>Temperature is above the target setpoint; relay is off.</summary>
+    Over,
+    /// <summary>Device has not reported within the staleness threshold.</summary>
+    Offline,
+    /// <summary>Device reported a sensor or communication error.</summary>
+    Error
+}
+
+/// <summary>
+/// Device status information retrieved from device twin reported properties.
 /// </summary>
 public class DeviceStatus
 {
@@ -12,6 +31,32 @@ public class DeviceStatus
     public int? TelemetryIntervalSeconds { get; set; }
     public DateTime? LastUpdate { get; set; }
     public bool IsConnected { get; set; }
+
+    /// <summary>
+    /// Typed operational status derived from the <see cref="Status"/> string and
+    /// <see cref="IsConnected"/> flag. Use this for UI color-coding.
+    /// </summary>
+    public DeviceOperationalStatus StatusKind { get; set; }
+
+    /// <summary>
+    /// Parses a raw device-twin status string into a <see cref="DeviceOperationalStatus"/> value.
+    /// </summary>
+    /// <param name="raw">Value of the <c>device_status</c> reported property.</param>
+    /// <param name="isConnected">Whether the device is considered online.</param>
+    public static DeviceOperationalStatus ParseStatusKind(string? raw, bool isConnected)
+    {
+        if (!isConnected)
+            return DeviceOperationalStatus.Offline;
+
+        return raw switch
+        {
+            "Heating" => DeviceOperationalStatus.Heating,
+            "On Temp" => DeviceOperationalStatus.OnTemp,
+            "Over" => DeviceOperationalStatus.Over,
+            null or "" => DeviceOperationalStatus.Unknown,
+            _ => DeviceOperationalStatus.Error  // error strings like "air:..." fall here
+        };
+    }
 }
 
 /// <summary>

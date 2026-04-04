@@ -20,6 +20,7 @@ internal sealed class IoTHubDeviceService : IDeviceControlService
     private const int MinTelemetryInterval = 5;
     private const int MaxTelemetryInterval = 300;
     private const string IoTHubApiVersion = "2021-04-12";
+    private static readonly TimeSpan StaleDeviceThreshold = TimeSpan.FromMinutes(10);
 
     public IoTHubDeviceService(
         IHttpClientFactory httpClientFactory,
@@ -70,15 +71,20 @@ internal sealed class IoTHubDeviceService : IDeviceControlService
         using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
         var reported = doc.RootElement.GetProperty("properties").GetProperty("reported");
 
+        var lastUpdate = TryGetDateTime(reported, "last_update");
+        var isConnected = lastUpdate.HasValue && (DateTime.UtcNow - lastUpdate.Value) < StaleDeviceThreshold;
+        var statusRaw = TryGetString(reported, "device_status");
+
         return new DeviceStatus
         {
             AirTemperature = TryGetDouble(reported, "air_temperature"),
             Meat1Temperature = TryGetDouble(reported, "meat1_temperature"),
             Meat2Temperature = TryGetDouble(reported, "meat2_temperature"),
-            Status = TryGetString(reported, "device_status"),
+            Status = statusRaw,
             TelemetryIntervalSeconds = TryGetInt(reported, "telemetry_interval_seconds"),
-            LastUpdate = TryGetDateTime(reported, "last_update"),
-            IsConnected = true
+            LastUpdate = lastUpdate,
+            IsConnected = isConnected,
+            StatusKind = DeviceStatus.ParseStatusKind(statusRaw, isConnected)
         };
     }
 

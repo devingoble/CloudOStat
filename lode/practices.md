@@ -131,7 +131,18 @@ Each scheme defines:
 - Global shared: `app.css`
 - MAUI platform-specific: CSS in platform folders if needed
 
-## Navigation Service
+## Device Status UI (`DeviceControl.razor`)
+
+The Device Control page renders:
+- **Connection badge** (`MudChip`) in the card header: green "Online" / red "Offline" from `IsConnected`
+- **Status chip** (`MudChip`) with `Color` mapped from `StatusKind`:
+  - `Heating` → `Color.Warning` (amber)
+  - `OnTemp` → `Color.Success` (green)
+  - `Over` / `Error` → `Color.Error` (red)
+  - `Offline` / `Unknown` → `Color.Default` (grey)
+- Raw `Status` string shown for `Error` state to expose device error messages
+
+
 **Route Definitions** (`NavigationService.cs`):
 - `PrimaryNav`: Home (MatchAll=true), Dashboard, Settings
 - `SecondaryNav`: Counter, Weather, About

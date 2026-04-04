@@ -32,6 +32,17 @@
                     <CardHeaderContent>
                         <MudText Typo="Typo.h6">Current Device Status</MudText>
                     </CardHeaderContent>
+                    <CardHeaderActions>
+                        @* Connection badge *@
+                        @if (_deviceStatus.IsConnected)
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Icon="@Icons.Material.Filled.Circle">Online</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Error" Size="Size.Small" Icon="@Icons.Material.Filled.Circle">Offline</MudChip>
+                        }
+                    </CardHeaderActions>
                 </MudCardHeader>
                 <MudCardContent>
                     <MudGrid>
@@ -76,7 +87,9 @@
                         </MudItem>
                         <MudItem xs="12" sm="6">
                             <MudText Typo="Typo.caption">Device Status</MudText>
-                            <MudText Typo="Typo.h6">@(_deviceStatus.Status ?? "Unknown")</MudText>
+                            <MudChip T="string" Color="@GetStatusColor(_deviceStatus.StatusKind)" Size="Size.Medium">
+                                @GetStatusLabel(_deviceStatus.StatusKind, _deviceStatus.Status)
+                            </MudChip>
                         </MudItem>
                     </MudGrid>
                     
@@ -167,7 +180,6 @@
             }
             else
             {
-                var range = DeviceControlService.GetTelemetryIntervalRange();
                 _newTelemetryInterval = 20; // Default value
             }
         }
@@ -215,4 +227,23 @@
             _isUpdating = false;
         }
     }
+
+    private static Color GetStatusColor(DeviceOperationalStatus kind) => kind switch
+    {
+        DeviceOperationalStatus.Heating => Color.Warning,
+        DeviceOperationalStatus.OnTemp  => Color.Success,
+        DeviceOperationalStatus.Over    => Color.Error,
+        DeviceOperationalStatus.Error   => Color.Error,
+        _                               => Color.Default
+    };
+
+    private static string GetStatusLabel(DeviceOperationalStatus kind, string? raw) => kind switch
+    {
+        DeviceOperationalStatus.Heating => "Heating",
+        DeviceOperationalStatus.OnTemp  => "On Temp",
+        DeviceOperationalStatus.Over    => "Over Temp",
+        DeviceOperationalStatus.Offline => "Offline",
+        DeviceOperationalStatus.Error   => raw ?? "Error",
+        _                               => "Unknown"
+    };
 }
